@@ -1,0 +1,1 @@
+Minimalist Deterministic Architecture
