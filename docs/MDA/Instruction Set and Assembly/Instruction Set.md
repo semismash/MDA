@@ -1,0 +1,113 @@
+The MDA ISA is a minimalist dual-nature instruction set which merges CPU operations with deterministic execution. 
+- Instructions are 16-bits long, fixed size.
+- They're encoded in little-endian order.
+- Instructions can set flags, as stored in the `FLAGS` register. 
+	- The three basic flags are Zero `Z`, Negative `N`, and Carry `C`.
+There are a total of 33 instructions in the MDA instruction set.
+## Instruction Types
+Instructions are classified into three broad types, which are further classified based on their encoding format. are `R`, `RI`, `I`, `LI`/`D`, `J`, `N`, `P`, and `S`. .
+#### Operational Instructions
+- Register Operations -
+	- Performs an operation on two registers, and stores the value in a third register
+	- Encoded instructions contain a dedicated write-back bit which tells if the result is to be written back to a register. Based on how the assembly instruction is written, the register is chosen to be updated accordingly.
+		- Flags in the `FLAGS` register are always set, regardless of the WB bit.
+		- In nearly all cases, the `Z` flag is set to `1` if the result is all 0, and the `N` flag is set to `1` if the MSB is 1. The one exception is `cmp` and `cmpa`, as given below.
+	- Sub-types include -
+		- `add` - Adds two register values. Sets `C` flag to `1` if carry.
+		- `and` - Logical AND on two register values.
+		- `or` - Logical OR on two register values.
+		- `xor` - Logical XOR on two register values.
+		- `cmp` - Sets a register value to `1` if `rs1` is less than `rs2`. Performs an unsigned comparison. Sets `N` to `1` if less than, `Z` to `1` if equal to, and nothing otherwise.
+		- `cmpa` - Same as `cmp` but performs a signed comparison instead.
+		- `shl` - Performs a logical left shift with zero extension on `rs1` by amount specified in `rs2`.
+		- `shr` - Performs a logical right shift with zero extension.
+	- Encoded in the `R` format (displayed LSB first) -
+		- `[15:13]` - RD (Destination Register)
+		- `[12:10]` - RS1 (Source Register 1)
+		- `[9:7]` - RS2 (Source Register 2)
+		- `[6:6]` - WB (Write Back bit)
+		- `[5:3]` - FUNCT (For granular instruction classification)
+		- `[2:0]` - OPCODE (Encoding format)
+- Immediate Operations-
+	- Performs an operation on a register and an immediate, and stores the value in a third register
+	- Encoded instructions contain a dedicated write-back bit which tells if the result is to be written back to a register. Based on how the assembly instruction is written, the register is chosen to be updated accordingly.
+		- Flags in the `FLAGS` register are always set, regardless of the WB bit.
+		- In all cases, the `Z` flag is set to `1` if the result is all 0, and the `N` flag is set to `1` if the MSB is 1.
+	- Sub-types include -
+		- `addi` - Adds a register value to an immediate. Sets `C` flag to `1` if carry.
+		- `xori` - Logical XOR on a register value and an immediate.
+		- `shli` - Performs a logical left shift with zero extension on `rs1` by amount specified by the immediate.
+		- `shri` - Performs a logical right shift with zero extension on `rs1` by amount specified by the immediate.
+	- Encoded in the `RI` format (displayed LSB first) -
+		- `[15:13]` - RD (Destination Register)
+		- `[12:10]` - RS1 (Source Register 1)
+		- `[9:7]` - Immediate `[3:1]`
+		- `[6:6]` - WB (Write Back bit)
+		- `[5:5]` -  Immediate `[0]`
+		- `[4:3]` - FUNCT (For granular instruction classification)
+		- `[2:0]` - OPCODE (Encoding format)
+- Immediate Loading -
+	- Performs operations involving immediate values, specifically updating the upper or lower bits of a register with the specified value.
+	- Sub-types include -
+		- `lli` - Updates the lower 8 bytes of the destination register with the encoded 8-bit immediate.
+		- `lui` - Updates the upper 8 bytes of the destination register with the encoded 8-bit immediate.
+		- `alipc` - Adds immediate to lower 8 bits of program counter, and stores result in register. Performs zero extension.
+		- `auipc` - Adds immediate to upper 8 bits of program counter, and stores result in register. Performs zero extension.
+	- Encoded in the `LI` format (stands for Load Immediate) -
+		- `[15:13]` - RD (Destination Register)
+		- `[12:5]` - Immediate `[7:0]`
+		- `[4:3]` - FUNCT
+		- `[2:0]` - OPCODE
+- Jumps -
+	- Performs a jump operation by updating the PC to a certain value.
+	- Sub-types include -
+		- `jmp` - Performs an unconditional jump to PC + IMM and saves the return address + 1 to `rd`.
+		- `jrg` - Performs an unconditional jump to `rs1[9:0]` + IMM and saves the return address + 1 to `rd`. 
+		- `jof` - Performs a conditional jump to PC + IMM without saving the return address. Checks a specific flag (as encoded in the immediate), and jumps to it if it's `1` (or if it's `0` if the invert bit in the instruction is high).
+		- `joc` - Performs a conditional jump to PC + IMM without saving the return address. Checks a given range of flags (as encoded in the immediate) via bit-masking, performs AND on all of them, and jumps if the final result is `1` (or if it's `0` if the invert bit in the instruction is high).
+	- Encoding for each jump instruction varies, but all jump instructions have `[2:0]` for OPCODE and `[4:3]` for FUNCT (to determine the jump type). The encoding for the established jumps are -
+		- `jmp` (D) - `[(15:13) RD, (12:5) IMM, (4:3) FUNCT, (2:0) OPCODE]`.
+		- `jrg` (I) - `[(15:13) RD, (12:10) RS1, (9:5) IMM, (4:3) FUNCT, (2:0) OPCODE]`.
+		- `jof` (J) - `[(15:5) IMM = IMMJ + IMMF + IMMI, (4:3) FUNCT, (2:0) OPCODE]`. Here, `IMMI` is the invert bit, `IMMF` are the flag bits (3 bits; specifies the location of the flag to be checked), `IMMJ` is the jump offset (7 bits).
+		- `joc` (J) - `[(15:5) IMM = IMMJ + IMMF + IMMI, (4:3) FUNCT, (2:0) OPCODE]`.  Here, `IMMI` is the invert bit, `IMMF` is the flag bitmask (specifies the locations of the flags to be checked), `IMMJ` is the jump offset (remaining bits).
+- Memory Accesses -
+	- Performs a memory access, either a LOAD or a STORE, with the chip's on board SRAM-based data memory.
+	- All memory access are unsigned. They can either access one byte or one word at a time.
+	- As the total addressable space is 2^10 words (2^11 bytes), only the bottom 11 bits from the calculated address are used by the memory module. 
+	- Sub-types include -
+		- `lb` - Loads one byte from the memory into specified register `rd`. Calculates the memory address from `rs1` + IMM.
+		- `lw` - Loads one word from the memory into specified register `rd`. Calculates the memory address from `rs1` + IMM. Words are loaded from the specified address ADDR, concatenated with ADDR + 1. Out of bounds accesses are ignored.
+		- `sb` - Stores one byte from specified register `rs2` into memory. Calculates the memory address from `rs1` + IMM.
+		- `sw` - Stores one word from specified register `rs2` into memory. Calculates the memory address from `rs1` + IMM. Words are stored to the specified address ADDR, concatenated with ADDR + 1. Out of bounds accesses are ignored.
+	- Encoding for loads and stores slightly vary based on the register fields. They're as follows -
+		- LOADs (I) - `[(15:13) RD, (12:10) RS1, (9:5) IMM, (4:3) FUNCT, (2:0) OPCODE]`
+		- STOREs (S) - `[(15:13) IMM[4:2], (12:10) RS1, (9:7) RS2, (6:5) IMM[1:0], (4:3) FUNCT, (2:0) OPCODE]`
+#### Spatial Instructions
+- Spatial Instructions are used to communicate with the I/O ports within the processor. The following are the spatial instructions included within the ISA.
+- The following spatial instructions are -
+	- `pull` - Pull data from ISR into GPR.
+	- `push` - Push data from GPR into OSR.
+	- `inp` - Fetch data from specified input pin into ISR.
+	- `outp` - Send data from OSR into specified output pin.
+	- `rpin` - Read data from specified pin directly into register.
+	- `wpin` - Send data from register directly to specified pin.
+- The spatial instructions are encoded in different formats, as follows -
+	- `pull` (D) - `[(15:13) RD, (12:5) IMM, (4:3) FUNCT, (2:0) OPCODE]`
+	- `push` (P) -  `[(15:13) IMM[7:5], (12:10) RS1, (9:6) IMM[4:1], (5:5) RS1_VALID = 1, (4:4) IMM[0], (3:3) FUNCT, (2:0) OPCODE]`
+	- `inp` (N) - `[(15:6) IMM, (5:5) RS1_VALID = 0, (4:3) FUNCT, (2:0) OPCODE]`
+	- `outp` (N) - `[(15:6) IMM, (5:5) RS1_VALID = 0, (4:3) FUNCT, (2:0) OPCODE]` 
+	- `rpin` (D) - `[(15:13) RD, (12:5) IMM, (4:3) FUNCT, (2:0) OPCODE]`
+	- `wpin` (P) -  `[(15:13) IMM[7:5], (12:10) RS1, (9:6) IMM[4:1], (5:5) RS1_VALID = 1, (4:4) IMM[0], (3:3) FUNCT, (2:0) OPCODE]`
+
+#### Temporal Instructions
+- Temporal instructions are used for temporal control, and add deterministic delays within the processor's execution.
+- The following temporal instructions are -
+	- `dl` - Put a processor's thread to sleep for IMM clock cycles.
+	- `dlrg` - Put a processor's thread to sleep for RS1 + IMM (offset) clock cycles.
+	- `waitp` - Put a processor's thread to sleep until a specific clock edge on a tracked pin.
+- The temporal instructions are encoded as follows -
+	- `dl` (N) - `[(15:6) IMM, (5:5) RS1_VALID = 0, (4:3) FUNCT, (2:0) OPCODE]`
+	- `dlrg` (D) - `[(15:13) RD, (12:5) IMM, (4:3) FUNCT, (2:0) OPCODE]`
+	- `waitp` (N) - `[(15:6) IMM, (5:5) RS1_VALID = 0, (4:3) FUNCT, (2:0) OPCODE]`
+
+*NOTE: Encoding descriptions for spatial and temporal instructions to be updated later in more detail.*

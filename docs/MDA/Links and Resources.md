@@ -1,0 +1,3 @@
+- **Jane Street Challenge -** https://blog.janestreet.com/protocol-emulator-asic-competition/
+- **RP2040 State Machine and ISA -** https://medium.com/geekculture/raspberry-pico-programming-with-pio-state-machines-e4610e6b0f29
+- **Bit Banging -** https://en.wikipedia.org/wiki/Bit_banging

@@ -1,0 +1,1 @@
+- Dual Core - 6 threads, two independent execution units.
