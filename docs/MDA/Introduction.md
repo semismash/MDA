@@ -4,8 +4,8 @@ The Minimalist Deterministic Architecture (MDA) is a CPU architecture aimed to p
 ### Core Architecture
 - Minimalist 3-thread CPU 3-stage pipelined (IF/ID/EX) CPU core
 - Interleaved Barrel Processing - Switches between 3 independent hardware threads in a strict round-robin order
-- Hazard Handling - None. Hazards are avoided within the design itself.
-- Timing Model - 100% Deterministic. This avoids stalls and makes sure that every single instruction is predictable.
+- Hazard Handling - None. Many data hazards are avoided within the design itself.
+- Timing Model - 100% Deterministic. This avoids many stalls and makes sure that every single instruction is predictable.
 ### Instructions and Memory
 - 16-bit Instruction width (constant, 2-byte alignment)
 - Minimally Variable Encoding between instruction types

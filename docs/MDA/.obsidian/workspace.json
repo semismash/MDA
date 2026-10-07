@@ -8,31 +8,17 @@
         "type": "tabs",
         "children": [
           {
-            "id": "54f5facd85f0637c",
-            "type": "leaf",
-            "state": {
-              "type": "markdown",
-              "state": {
-                "file": "Developer Specific Notes/Yapping.md",
-                "mode": "source",
-                "source": false
-              },
-              "icon": "lucide-file",
-              "title": "Yapping"
-            }
-          },
-          {
             "id": "d62191de9408eb3c",
             "type": "leaf",
             "state": {
               "type": "markdown",
               "state": {
-                "file": "Instruction Set and Assembly/Instruction Set.md",
+                "file": "Processor Architecture/Threading.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "Instruction Set"
+              "title": "Threading"
             }
           },
           {
@@ -47,20 +33,6 @@
               },
               "icon": "lucide-file",
               "title": "Instruction Encoding"
-            }
-          },
-          {
-            "id": "f2a6475928e6daf5",
-            "type": "leaf",
-            "state": {
-              "type": "markdown",
-              "state": {
-                "file": "Instruction Set and Assembly/Assembly.md",
-                "mode": "source",
-                "source": false
-              },
-              "icon": "lucide-file",
-              "title": "Assembly"
             }
           },
           {
@@ -155,7 +127,7 @@
             "state": {
               "type": "backlink",
               "state": {
-                "file": "Developer Specific Notes/Yapping.md",
+                "file": "Instruction Set and Assembly/Instruction Encoding.md",
                 "collapseAll": false,
                 "extraContext": false,
                 "sortOrder": "alphabetical",
@@ -174,7 +146,7 @@
             "state": {
               "type": "outgoing-link",
               "state": {
-                "file": "Developer Specific Notes/Yapping.md",
+                "file": "Instruction Set and Assembly/Instruction Encoding.md",
                 "linksCollapsed": false,
                 "unlinkedCollapsed": true
               },
@@ -217,7 +189,7 @@
             "state": {
               "type": "outline",
               "state": {
-                "file": "Developer Specific Notes/Yapping.md",
+                "file": "Instruction Set and Assembly/Instruction Encoding.md",
                 "followCursor": false,
                 "showSearch": false,
                 "searchQuery": ""
@@ -244,18 +216,19 @@
       "bases:Create new base": false
     }
   },
-  "active": "54f5facd85f0637c",
+  "active": "d62191de9408eb3c",
   "lastOpenFiles": [
-    "Developer Specific Notes/Possible Features.md",
-    "Instruction Set and Assembly/Assembly.md",
+    "Introduction.md",
     "Instruction Set and Assembly/Instruction Encoding.md",
-    "Instruction Set and Assembly/Instruction Set.md",
+    "Developer Specific Notes/Possible Features.md",
+    "Processor Architecture/Threading.md",
+    "Processor Architecture",
     "Developer Specific Notes/Yapping.md",
-    "Threading.md",
     "Links and Resources.md",
+    "Instruction Set and Assembly/Instruction Set.md",
+    "Instruction Set and Assembly/Assembly.md",
     "Instruction Set and Assembly",
     "Untitled.md",
-    "Introduction.md",
     "Developer Specific Notes",
     "Welcome.md"
   ]

@@ -15,7 +15,7 @@ The encoding for the 9 types of instructions are listed as follows -
 - LI-Type & D-Type - `[(15:13) RD, (12:5) IMM, (4:3) FUNCT, (2:0) OPCODE]`
 - J-Type - `[(15:5) IMM, (4:3) FUNCT, (2:0) OPCODE]`
 - N-Type - `[(15:6) IMM, (5:5) RS1_VALID = 0, (4:3) FUNCT, (2:0) OPCODE]`
-- P-Type - `[(15:13) IMM[7:5], (12:10) RS1, (9:6) IMM[4:1], (5:5) RS1_VALID = 1, (4:4) IMM[0], (3:3) FUNCT, (2:0) OPCODE]`
+- P-Type - `[(15:13) IMM[6:4], (12:10) RS1, (9:6) IMM[3:0], (5:5) RS1_VALID = 1, (4:3) FUNCT, (2:0) OPCODE]`
 - S-Type - `[(15:13) IMM[4:2], (12:10) RS1, (9:7) RS2, (6:5) IMM[1:0], (4:3) FUNCT, (2:0) OPCODE]`
 
 The instruction type spec-sheet is given as follows -
@@ -29,6 +29,6 @@ The instruction type spec-sheet is given as follows -
 | D                    | `111`      | 2 bits         | No      | No      | Yes    | 8 bits       | Yes       |
 | J                    | `001`      | 2 bits         | No      | No      | No     | 11 bits      | No        |
 | N                    | `101`      | 2 bits         | No      | No      | No     | 10 bits      | No        |
-| P                    | `101`      | 1 bit          | Yes     | No      | No     | 8 bits       | No        |
+| P                    | `101`      | 2 bit          | Yes     | No      | No     | 7 bits       | No        |
 | S                    | `100`      | 2 bits         | Yes     | Yes     | No     | 5 bits       | No        |
 *\*To be determined by the entity that is writing the code or encoding the program.*

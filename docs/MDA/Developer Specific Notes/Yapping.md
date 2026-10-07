@@ -2,11 +2,11 @@
 R - 8 - add, xor, and, or, cmp, cmpa, shl, shr
 RI - 4 - addi, xori, shli, shri
 I - 3 - jrg, lb, lw
-LI - 4 - lui, lli, auipc, alipc
-D - 4 - jmp, dlrg, pull, rpin
+LI - 3 - lui, lli, auipc, alipc
+D - 4 - jmp, pull, rpin
 J - 2 - jof, joc
 N - 4 - inp, outp, dl, waitp
-P - 2 - push, wpin
+P - 3 - push, wpin, dlrg
 S - 2 - sb, sw
 related encoding pairs -
 R - isolated

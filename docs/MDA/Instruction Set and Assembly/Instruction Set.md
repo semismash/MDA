@@ -93,11 +93,11 @@ Instructions are classified into three broad types, which are further classified
 	- `wpin` - Send data from register directly to specified pin.
 - The spatial instructions are encoded in different formats, as follows -
 	- `pull` (D) - `[(15:13) RD, (12:5) IMM, (4:3) FUNCT, (2:0) OPCODE]`
-	- `push` (P) -  `[(15:13) IMM[7:5], (12:10) RS1, (9:6) IMM[4:1], (5:5) RS1_VALID = 1, (4:4) IMM[0], (3:3) FUNCT, (2:0) OPCODE]`
+	- `push` (P) - `[(15:13) IMM[6:4], (12:10) RS1, (9:6) IMM[3:0], (5:5) RS1_VALID = 1, (4:3) FUNCT, (2:0) OPCODE]`
 	- `inp` (N) - `[(15:6) IMM, (5:5) RS1_VALID = 0, (4:3) FUNCT, (2:0) OPCODE]`
 	- `outp` (N) - `[(15:6) IMM, (5:5) RS1_VALID = 0, (4:3) FUNCT, (2:0) OPCODE]` 
 	- `rpin` (D) - `[(15:13) RD, (12:5) IMM, (4:3) FUNCT, (2:0) OPCODE]`
-	- `wpin` (P) -  `[(15:13) IMM[7:5], (12:10) RS1, (9:6) IMM[4:1], (5:5) RS1_VALID = 1, (4:4) IMM[0], (3:3) FUNCT, (2:0) OPCODE]`
+	- `wpin` (P) -  `[(15:13) IMM[6:4], (12:10) RS1, (9:6) IMM[3:0], (5:5) RS1_VALID = 1, (4:3) FUNCT, (2:0) OPCODE]`
 
 #### Temporal Instructions
 - Temporal instructions are used for temporal control, and add deterministic delays within the processor's execution.
@@ -107,7 +107,7 @@ Instructions are classified into three broad types, which are further classified
 	- `waitp` - Put a processor's thread to sleep until a specific clock edge on a tracked pin.
 - The temporal instructions are encoded as follows -
 	- `dl` (N) - `[(15:6) IMM, (5:5) RS1_VALID = 0, (4:3) FUNCT, (2:0) OPCODE]`
-	- `dlrg` (D) - `[(15:13) RD, (12:5) IMM, (4:3) FUNCT, (2:0) OPCODE]`
+	- `dlrg` (P) - `[(15:13) IMM[6:4], (12:10) RS1, (9:6) IMM[3:0], (5:5) RS1_VALID = 1, (4:3) FUNCT, (2:0) OPCODE]`
 	- `waitp` (N) - `[(15:6) IMM, (5:5) RS1_VALID = 0, (4:3) FUNCT, (2:0) OPCODE]`
 
 *NOTE: Encoding descriptions for spatial and temporal instructions to be updated later in more detail.*
