@@ -13,12 +13,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "Processor Architecture/Threading.md",
+                "file": "Instruction Set and Assembly/Assembly.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "Threading"
+              "title": "Assembly"
             }
           },
           {
@@ -49,7 +49,8 @@
               "title": "Possible Features"
             }
           }
-        ]
+        ],
+        "currentTab": 1
       }
     ],
     "direction": "vertical"
@@ -216,19 +217,23 @@
       "bases:Create new base": false
     }
   },
-  "active": "d62191de9408eb3c",
+  "active": "c0736059ef12fae2",
   "lastOpenFiles": [
-    "Introduction.md",
+    "Instruction Set and Assembly/Assembly.md",
     "Instruction Set and Assembly/Instruction Encoding.md",
+    "Processor Architecture/Events and Interrupts.md",
     "Developer Specific Notes/Possible Features.md",
+    "Untitled.md",
+    "Firmware Specifications",
+    "Processor Architecture/I-O Interface.md",
+    "Processor Architecture/Core Components.md",
     "Processor Architecture/Threading.md",
+    "Introduction.md",
     "Processor Architecture",
     "Developer Specific Notes/Yapping.md",
     "Links and Resources.md",
     "Instruction Set and Assembly/Instruction Set.md",
-    "Instruction Set and Assembly/Assembly.md",
     "Instruction Set and Assembly",
-    "Untitled.md",
     "Developer Specific Notes",
     "Welcome.md"
   ]

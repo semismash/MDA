@@ -1,1 +1,2 @@
 - Dual Core - 6 threads, two independent execution units.
+- Variable Length Instructions (16-bit + 32-bit)
