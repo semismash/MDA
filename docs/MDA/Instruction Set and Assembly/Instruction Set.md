@@ -2,14 +2,16 @@ The MDA ISA is a minimalist dual-nature instruction set which merges CPU operati
 - Instructions are 16-bits long, fixed size.
 - They're encoded in little-endian order.
 - Instructions can set flags, as stored in the `FLAGS` register. 
-	- The three basic flags are Zero `Z`, Negative `N`, and Carry `C`.
-There are a total of 33 instructions in the MDA instruction set.
+	- The three basic flags are Zero `Z`, Negative `N`, and Carry `C`
+	- In addition to these, the `FLAGS` register also holds event flags and global (IPC) flags. There are 16 flags in total (tentatively 32 if the word size moves to 32 bits), which are either local to a thread or global to all threads. The flag layout is given in the [`Events.md`](../Processor%20Architecture/Events.md) file.
+Tentatively, there are a total of 38 instructions in the MDA instruction set (33 existing ones, plus `lh`, `sh`, `waitev`, `flg` and `cfg`).
 ## Instruction Types
 Instructions are classified into three broad types, which are further classified based on their encoding format. are `R`, `RI`, `I`, `LI`/`D`, `J`, `N`, `P`, and `S`. .
 #### Operational Instructions
 - Register Operations -
 	- Performs an operation on two registers, and stores the value in a third register
-	- Encoded instructions contain a dedicated write-back bit which tells if the result is to be written back to a register. Based on how the assembly instruction is written, the register is chosen to be updated accordingly.
+	- There is no hardwired zero register, all 8 GPRs are usable.
+	- Encoded instructions contain a dedicated write-back (WB) bit which tells if the result is to be written back to a register. Based on how the assembly instruction is written, the register is chosen to be updated accordingly.
 		- Flags in the `FLAGS` register are always set, regardless of the WB bit.
 		- In nearly all cases, the `Z` flag is set to `1` if the result is all 0, and the `N` flag is set to `1` if the MSB is 1. The one exception is `cmp` and `cmpa`, as given below.
 	- Sub-types include -
@@ -19,8 +21,8 @@ Instructions are classified into three broad types, which are further classified
 		- `xor` - Logical XOR on two register values.
 		- `cmp` - Sets a register value to `1` if `rs1` is less than `rs2`. Performs an unsigned comparison. Sets `N` to `1` if less than, `Z` to `1` if equal to, and nothing otherwise.
 		- `cmpa` - Same as `cmp` but performs a signed comparison instead.
-		- `shl` - Performs a logical left shift with zero extension on `rs1` by amount specified in `rs2`.
-		- `shr` - Performs a logical right shift with zero extension.
+		- `shl` - Performs a logical left shift with zero extension on `rs1` by amount specified in `rs2`. Sets `C` flag to the last bit that was shifted out. A shift by 0 leaves `C` unchanged.
+		- `shr` - Performs a logical right shift with zero extension, otherwise same as above.
 	- Encoded in the `R` format (displayed LSB first) -
 		- `[15:13]` - RD (Destination Register)
 		- `[12:10]` - RS1 (Source Register 1)
@@ -33,11 +35,12 @@ Instructions are classified into three broad types, which are further classified
 	- Encoded instructions contain a dedicated write-back bit which tells if the result is to be written back to a register. Based on how the assembly instruction is written, the register is chosen to be updated accordingly.
 		- Flags in the `FLAGS` register are always set, regardless of the WB bit.
 		- In all cases, the `Z` flag is set to `1` if the result is all 0, and the `N` flag is set to `1` if the MSB is 1.
+	- The immediates of the given I-type instructions are sign extended in case of `addi` and `xori`, and zero extended in case of `shli` and `shri`.
 	- Sub-types include -
 		- `addi` - Adds a register value to an immediate. Sets `C` flag to `1` if carry.
 		- `xori` - Logical XOR on a register value and an immediate.
-		- `shli` - Performs a logical left shift with zero extension on `rs1` by amount specified by the immediate.
-		- `shri` - Performs a logical right shift with zero extension on `rs1` by amount specified by the immediate.
+		- `shli` - Performs a logical left shift with zero extension on `rs1` by amount specified by the immediate. Sets `C` flag to the last bit that was shifted out. A shift by 0 leaves `C` unchanged.
+		- `shri` - Performs a logical right shift with zero extension on `rs1` by amount specified by the immediate. Otherwise, same as above.
 	- Encoded in the `RI` format (displayed LSB first) -
 		- `[15:13]` - RD (Destination Register)
 		- `[12:10]` - RS1 (Source Register 1)
@@ -49,10 +52,11 @@ Instructions are classified into three broad types, which are further classified
 - Immediate Loading -
 	- Performs operations involving immediate values, specifically updating the upper or lower bits of a register with the specified value.
 	- Sub-types include -
-		- `lli` - Updates the lower 8 bytes of the destination register with the encoded 8-bit immediate.
-		- `lui` - Updates the upper 8 bytes of the destination register with the encoded 8-bit immediate.
+		- `lli` - Updates the lower 8 bits of the destination register with the encoded 8-bit immediate.
+		- `lui` - Updates the upper 8 bits of the destination register with the encoded 8-bit immediate.
 		- `alipc` - Adds immediate to lower 8 bits of program counter, and stores result in register. Performs zero extension.
 		- `auipc` - Adds immediate to upper 8 bits of program counter, and stores result in register. Performs zero extension.
+	- **\[TENTATIVE\]** If the word size moves to 32 bits, `lli` and `lui` will need to be reworked to build 32-bit constants efficiently (e.g. using PC-relative literal loads).
 	- Encoded in the `LI` format (stands for Load Immediate) -
 		- `[15:13]` - RD (Destination Register)
 		- `[12:5]` - Immediate `[7:0]`
@@ -64,24 +68,34 @@ Instructions are classified into three broad types, which are further classified
 		- `jmp` - Performs an unconditional jump to PC + IMM and saves the return address + 1 to `rd`.
 		- `jrg` - Performs an unconditional jump to `rs1[9:0]` + IMM and saves the return address + 1 to `rd`. 
 		- `jof` - Performs a conditional jump to PC + IMM without saving the return address. Checks a specific flag (as encoded in the immediate), and jumps to it if it's `1` (or if it's `0` if the invert bit in the instruction is high).
-		- `joc` - Performs a conditional jump to PC + IMM without saving the return address. Checks a given range of flags (as encoded in the immediate) via bit-masking, performs AND on all of them, and jumps if the final result is `1` (or if it's `0` if the invert bit in the instruction is high).
+		- `joc` - Performs a conditional jump to PC + IMM without saving the return address. The flag mask is taken from the register `rs1`, so any of the flags can be selected. The selected flags are checked according to a mode (given by a 2-bit field in the instruction) - all selected flags set, any selected flag set, no selected flag set, or not all selected flags set - and the jump is performed if the condition holds.
 	- Encoding for each jump instruction varies, but all jump instructions have `[2:0]` for OPCODE and `[4:3]` for FUNCT (to determine the jump type). The encoding for the established jumps are -
 		- `jmp` (D) - `[(15:13) RD, (12:5) IMM, (4:3) FUNCT, (2:0) OPCODE]`.
 		- `jrg` (I) - `[(15:13) RD, (12:10) RS1, (9:5) IMM, (4:3) FUNCT, (2:0) OPCODE]`.
-		- `jof` (J) - `[(15:5) IMM = IMMJ + IMMF + IMMI, (4:3) FUNCT, (2:0) OPCODE]`. Here, `IMMI` is the invert bit, `IMMF` are the flag bits (3 bits; specifies the location of the flag to be checked), `IMMJ` is the jump offset (7 bits).
-		- `joc` (J) - `[(15:5) IMM = IMMJ + IMMF + IMMI, (4:3) FUNCT, (2:0) OPCODE]`.  Here, `IMMI` is the invert bit, `IMMF` is the flag bitmask (specifies the locations of the flags to be checked), `IMMJ` is the jump offset (remaining bits).
-- Memory Accesses -
-	- Performs a memory access, either a LOAD or a STORE, with the chip's on board SRAM-based data memory.
-	- All memory access are unsigned. They can either access one byte or one word at a time.
-	- As the total addressable space is 2^10 words (2^11 bytes), only the bottom 11 bits from the calculated address are used by the memory module. 
-	- Sub-types include -
-		- `lb` - Loads one byte from the memory into specified register `rd`. Calculates the memory address from `rs1` + IMM.
-		- `lw` - Loads one word from the memory into specified register `rd`. Calculates the memory address from `rs1` + IMM. Words are loaded from the specified address ADDR, concatenated with ADDR + 1. Out of bounds accesses are ignored.
-		- `sb` - Stores one byte from specified register `rs2` into memory. Calculates the memory address from `rs1` + IMM.
-		- `sw` - Stores one word from specified register `rs2` into memory. Calculates the memory address from `rs1` + IMM. Words are stored to the specified address ADDR, concatenated with ADDR + 1. Out of bounds accesses are ignored.
-	- Encoding for loads and stores slightly vary based on the register fields. They're as follows -
-		- LOADs (I) - `[(15:13) RD, (12:10) RS1, (9:5) IMM, (4:3) FUNCT, (2:0) OPCODE]`
-		- STOREs (S) - `[(15:13) IMM[4:2], (12:10) RS1, (9:7) RS2, (6:5) IMM[1:0], (4:3) FUNCT, (2:0) OPCODE]`
+		- `jof` (J) - `[(15:5) IMM = IMMJ + IMMF + IMMI, (4:3) FUNCT, (2:0) OPCODE]`. Here, `IMMI` is the invert bit, `IMMF` are the flag bits (4 bits; specifies the location of the flag to be checked, out of 16 flags), `IMMJ` is the jump offset (6 bits).
+		- **\[TENTATIVE\]** `joc` (J) - `[(15:12) IMM = IMMJ + IMMM, (12:10) RS1, (9:5) IMM, (4:3) FUNCT, (2:0) OPCODE]`. Here, `IMMM` (2 bits) is the condition mode (`00` - all selected flags set, `01` - any selected flag set, `10` - no selected flag set, `11` - not all selected flags set), `IMMJ` is the jump offset (6 bits). Note that the decoder reads a register from the immediate field.
+		- Conditional jumps reach ±32 instructions. A farther conditional jump is expanded by the assembler into an inverted conditional jump over a `jmp` (flagged using the `$` prefix, as it changes the cycle count).
+		- Jumps have no penalty in the barrel pipeline, as the next instruction of the same thread is only fetched 3 cycles later.
+#### Memory Access Instructions -
+- Performs a memory access, either a LOAD or a STORE, with the chip's on board SRAM-based data memory.
+- All memory accesses are unsigned (i.e. there are no signed loads). They can access one byte, one half-word (`lh` and `sh`, only if the word size moves to 32 bits) or one word at a time.
+- As the total addressable space is 2^10 words (2^11 bytes) (**tentative**, the final size depends on the SRAM macro used), addresses are not wrapped. Any access outside of the memory is an out-of-bounds fault.
+- Half-word and word accesses must be aligned to their size, a misaligned access is a fault.
+- Faults - A faulting access still completes in its normal slot, so timing is never affected. A faulting store is suppressed (memory is not changed), and a faulting load returns 0 to `rd`. In both cases, the thread's `ERR` flag is set along with the fault cause (see [`Events.md`](../Processor%20Architecture/Events.md)).
+- Offsets - Offsets are unsigned and scaled by the access size (tentative), e.g. a 5-bit offset reaches 31 bytes with a byte access, but 31 words with a word access.
+- Sub-types include -
+	- `lb` - Loads one byte from the memory into specified register `rd`. Calculates the memory address from `rs1` + IMM.
+	- `lh` - Loads one half-word (zero extended) from the memory into specified register `rd`. Calculates the memory address from `rs1` + IMM. The address must be half-word aligned. Only included if the word size moves to 32 bits (tentative).
+	- `lw` - Loads one word from the memory into specified register `rd`. Calculates the memory address from `rs1` + IMM. Words are loaded from the specified (word aligned) address ADDR, plus the next 1 or 3 bytes (**\[TENTATIVE\]** Depending on whether the word size is 16 or 32 bits respectively). Out of bounds or misaligned accesses are faults, as given above.
+	- `sb` - Stores one byte from specified register `rs2` into memory. Calculates the memory address from `rs1` + IMM.
+	- `sh` - Stores one half-word from specified register `rs2` into memory. Calculates the memory address from `rs1` + IMM. The address must be half-word aligned. Only included if the word size moves to 32 bits (tentative).
+	- `sw` - Stores one word from specified register `rs2` into memory. Calculates the memory address from `rs1` + IMM. Words are stored to the specified (word aligned) address ADDR, plus the next 1 or 3 bytes (**\[TENTATIVE\]** Depending on whether the word size is 16 or 32 bits respectively). Out of bounds or misaligned accesses are faults, as given above.
+- Encoding for loads and stores slightly vary based on the register fields. They're as follows -
+	- LOADs (I) - `[(15:13) RD, (12:10) RS1, (9:5) IMM, (4:3) FUNCT, (2:0) OPCODE]`
+	- STOREs (S) - `[(15:13) IMM[4:2], (12:10) RS1, (9:7) RS2, (6:5) IMM[1:0], (4:3) FUNCT, (2:0) OPCODE]`
+#### IPC Instructions -
+- Inter-process communication (IPC) instructions are used between threads to communicate with one another.
+- **TBA**
 #### Spatial Instructions
 - Spatial Instructions are used to communicate with the I/O ports within the processor. The following are the spatial instructions included within the ISA.
 - The following spatial instructions are -
@@ -98,16 +112,25 @@ Instructions are classified into three broad types, which are further classified
 	- `outp` (N) - `[(15:6) IMM, (5:5) RS1_VALID = 0, (4:3) FUNCT, (2:0) OPCODE]` 
 	- `rpin` (D) - `[(15:13) RD, (12:5) IMM, (4:3) FUNCT, (2:0) OPCODE]`
 	- `wpin` (P) -  `[(15:13) IMM[6:4], (12:10) RS1, (9:6) IMM[3:0], (5:5) RS1_VALID = 1, (4:3) FUNCT, (2:0) OPCODE]`
+- Shift engines (tentative) -
+	- `inp` and `outp` start an autonomous shift engine (one per thread, per direction) instead of moving a single bit per instruction. The engine samples (`inp`) or drives (`outp`) one bit every DIV clock cycles, for `count` bits, running on the raw clock independent of the thread's slot. This makes the bit timing cycle-exact.
+	- The instruction returns immediately. When the transfer is done, the `ISR_RDY` (for `inp`) or `OSR_EMPTY` (for `outp`) flag is set, which the thread can observe using `jof`, `joc` or `waitev`.
+	- Starting a transfer while that engine is still busy sets `ERR`.
+	- The divisor DIV is set using `cfg` (see `I-O_Interface.md`).
 
-#### Temporal Instructions
+#### Temporal & Event Instructions
 - Temporal instructions are used for temporal control, and add deterministic delays within the processor's execution.
 - The following temporal instructions are -
 	- `dl` - Put a processor's thread to sleep for IMM clock cycles.
 	- `dlrg` - Put a processor's thread to sleep for RS1 + IMM (offset) clock cycles.
-	- `waitp` - Put a processor's thread to sleep until a specific clock edge on a tracked pin.
+	- `waitev` - Put a processor's thread to sleep until a specific clock edge on a watched event.
+	-  `flg` - Read the `FLAGS` register into a register, or set or clear sticky flags using a mask. The sub-operation is encoded in the immediate.
+	- `cfg` - Configure event and I/O hardware (pin watchers, shift engine divisors, timers). The target is selected by the immediate, and the value is taken from `rs1`.
 - The temporal instructions are encoded as follows -
 	- `dl` (N) - `[(15:6) IMM, (5:5) RS1_VALID = 0, (4:3) FUNCT, (2:0) OPCODE]`
 	- `dlrg` (P) - `[(15:13) IMM[6:4], (12:10) RS1, (9:6) IMM[3:0], (5:5) RS1_VALID = 1, (4:3) FUNCT, (2:0) OPCODE]`
-	- `waitp` (N) - `[(15:6) IMM, (5:5) RS1_VALID = 0, (4:3) FUNCT, (2:0) OPCODE]`
+	- `waitev` -  **\[TENTATIVE\]**
+	- `flg` -  **\[TENTATIVE\]**
+	- `cfg` -  **\[TENTATIVE\]**
 
 *NOTE: Encoding descriptions for spatial and temporal instructions to be updated later in more detail.*
