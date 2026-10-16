@@ -1,3 +1,5 @@
 - **Jane Street Challenge -** https://blog.janestreet.com/protocol-emulator-asic-competition/
+- **TinyTapeout SRAM** - https://www.tinytapeout.com/chips/ttihp0p2/tt_um_urish_sram_test
+- **TinyTapeout Verilog Project Template** - https://github.com/TinyTapeout/ttihp-verilog-template
 - **RP2040 State Machine and ISA -** https://medium.com/geekculture/raspberry-pico-programming-with-pio-state-machines-e4610e6b0f29
 - **Bit Banging -** https://en.wikipedia.org/wiki/Bit_banging
