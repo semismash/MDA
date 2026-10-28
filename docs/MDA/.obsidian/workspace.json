@@ -13,12 +13,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "Developer Specific Notes/I am very angry and I want to break something.md",
+                "file": "Processor Architecture/Events.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "I am very angry and I want to break something"
+              "title": "Events"
             }
           }
         ]
@@ -190,22 +190,22 @@
   },
   "active": "4b13717d8e00b30b",
   "lastOpenFiles": [
-    "Developer Specific Notes/Yapping.md",
-    "Developer Specific Notes/I am very angry and I want to break something.md",
-    "Developer Specific Notes/Possible Features.md",
-    "Links and Resources.md",
-    "Processor Architecture/Core Components.md",
+    "Processor Architecture/I-O Interface.md",
     "Processor Architecture/Events.md",
-    "Instruction Set and Assembly/Instruction Set.md",
+    "Processor Architecture/Core Components.md",
     "Instruction Set and Assembly/Instruction Encoding.md",
+    "Instruction Set and Assembly/Instruction Set.md",
+    "Instruction Set and Assembly/Assembly.md",
+    "Developer Specific Notes/Possible Features.md",
+    "Introduction.md",
+    "Processor Architecture/Threading.md",
+    "Developer Specific Notes/I am very angry and I want to break something.md",
+    "Developer Specific Notes/Yapping.md",
+    "Links and Resources.md",
     "Processor.md",
     "().md",
-    "Processor Architecture/I-O Interface.md",
-    "Instruction Set and Assembly/Assembly.md",
     "Untitled.md",
     "Firmware Specifications",
-    "Processor Architecture/Threading.md",
-    "Introduction.md",
     "Processor Architecture",
     "Instruction Set and Assembly",
     "Developer Specific Notes",

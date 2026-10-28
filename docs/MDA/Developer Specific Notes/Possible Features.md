@@ -1,2 +1,5 @@
 - Dual Core - 6 threads, two independent execution units.
-- Variable Length Instructions (16-bit + 32-bit)
+- Variable Length Instructions (16-bit + 32-bit) - A limited form already exists, the suffix halfword used by `lli`. General 32-bit instructions are still a possible feature.
+- Half-word loads and stores (`lh`, `sh`) - Dropped for now, as there is no encoding space.
+- A second shift engine per thread, or a shadow register for the engine, to remove the gap between words (costs area).
+- An external-clock hardware watcher qualified by another pin's level, for faster I2C slave START/STOP detection.
