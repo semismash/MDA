@@ -11,7 +11,7 @@ Events are changes in the hardware state that can be observed in the CPU. They d
 - Event state is held in the `FLAGS` register, so events are observed using the same conditional jumps as the ALU flags (`jof`, `joc`), and can be waited on using `waitev`. Flags are of two kinds -
     - **Sticky** - Set by hardware (or by a doorbell ring from another thread), and cleared only by software (using `flg`, by consuming them in `waitev`, or by re-arming the thing that sets them). Examples - pin edge events, `TMR`, `ERR`, `OVR`, doorbells.
     - **Live** - Mirror the current hardware state, and clear themselves. Examples - pin level conditions, `PE`, ISR/OSR status.
-- All flags are local to a thread, each thread has its own view of them. There are no global flags. The doorbell state is physically shared between threads (6 bits), but each thread only sees its own two incoming bits (see `Threading.md`).
+- All flags are local to a thread, each thread has its own view of them. There are no global flags. The doorbell state is physically shared between threads (6 bits), but each thread only sees its own two incoming bits (see [`Threading.md`](Threading.md)).
 - Every thread sees the flags as they were at the start of its own slot.
 - **One writer rule** - Every flag has exactly one source that sets it (an instruction, hardware, or another thread's doorbell ring). Software never writes a flag that mirrors hardware state. The only direct software writes are acknowledging sticky flags (`ERR`, `OVR`, `MSG_N`, `MSG_P`) and ringing another thread's doorbell, both using `flg`. This keeps every flag traceable to a single source, which makes it checkable in verification.
 
@@ -37,7 +37,7 @@ Events are changes in the hardware state that can be observed in the CPU. They d
 |12|`TMR`|Sticky|The thread's timer expires|`cfg` re-arm or disarm of the timer, or `waitev` consume|
 |13-15|Spare|-|-|-|
 
-- The ALU flag behavior of each instruction is given in `Instruction_Set.md`.
+- The ALU flag behavior of each instruction is given in [`Instruction Set.md`](../Instruction%20Set%20and%20Assembly/Instruction%20Set.md).
 - The next thread of thread `i` is thread `(i + 1) mod 3`, and the previous thread is `(i - 1) mod 3`.
 
 ### Overrun Rules
@@ -54,7 +54,7 @@ Events are changes in the hardware state that can be observed in the CPU. They d
 
 ### Pin Watchers
 
-- Pin events are detected by pin watchers. Every pin has its own watcher, and its events are routed to the thread that owns the pin (see `I-O_Interface.md`). There is no fixed number of watchers per thread.
+- Pin events are detected by pin watchers. Every pin has its own watcher, and its events are routed to the thread that owns the pin (see [`I-O Interface.md`](I-O%20Interface.md)). There is no fixed number of watchers per thread.
 - All 24 pins pass through a 2-flop synchronizer, followed by a "previous sample" flop. These are shared by all threads. A rising edge is `current & ~previous`, and a falling edge is `~current & previous`.
 - Each watcher has a 3-bit mode, configured using `cfg`, and a one bit event bit -
 
@@ -70,7 +70,7 @@ Events are changes in the hardware state that can be observed in the CPU. They d
 |`111`|ANY|Sticky|Either a rising or a falling edge occurs|
 
 - The top bit of the mode selects level or edge, and the lower two bits are independent enables (low and high in the level group, rising and falling in the edge group). `ANY` is therefore just both edge enables set, with no special case.
-- The event bits of all the pins a thread owns are ORed into that thread's `PE` flag. To find out which pin fired, software reads the event bits using `rpin` (see `I-O_Interface.md`).
+- The event bits of all the pins a thread owns are ORed into that thread's `PE` flag. To find out which pin fired, software reads the event bits using `rpin` (see [`I-O_Interface.md`](I-O%20Interface.md)).
 - Configuring a watcher (or transferring the pin) clears its event bit, so edges that occurred before arming it are never seen.
 - The detection latency is fixed - 2 synchronizer cycles + 1 detection cycle, followed by the 0-2 cycles it takes for the thread's next slot.
 - (TENTATIVE) Each watcher can also latch a 2-bit phase when its event occurs (where in the 3-cycle slot rotation the edge landed), which software can read to compensate for the slot quantization. This is an optional feature, to be decided later.

@@ -18,7 +18,7 @@ The Minimalist Deterministic Architecture (MDA) is a CPU architecture aimed to p
 - Word Width - 32-bit data word. 8 GPRs per thread
 - Minimal Register file with 8 GPRs per thread (24 total)
 - Memory-on-chip approach. Fast SRAM, with separate instruction and data memory. Zero extra cycles of mem-access penalty.
-- Firmware is loaded into the SRAM by a small hardware loader at startup (TENTATIVE, see `Core_Components.md`).
+- Firmware is loaded into the SRAM by a small hardware loader at startup (TENTATIVE, see [`Core_Components.md`](Core%20Components.md)).
 
 ### ISA
 

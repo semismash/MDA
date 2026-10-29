@@ -15,7 +15,7 @@ Given below are the core components of MDA. Most of this is tentative, and the a
 |1024x32|~4.4|
 |1024x16|~2.5|
 
-- **Event and I/O hardware** - 24 pins shared by all threads, each with a per-pin watcher (3-bit mode and an event bit) and an ownership field (2 bits), all behind a 2-flop synchronizer and a "previous sample" flop that are shared by all threads. Each thread has one shift engine (TENTATIVE) with a 16-bit divisor, and its own timer. See `I-O_Interface.md` and `Events.md`.
+- **Event and I/O hardware** - 24 pins shared by all threads, each with a per-pin watcher (3-bit mode and an event bit) and an ownership field (2 bits), all behind a 2-flop synchronizer and a "previous sample" flop that are shared by all threads. Each thread has one shift engine (TENTATIVE) with a 16-bit divisor, and its own timer. See [`I-O Interface.md`](I-O%20Interface.md) and [`Events.md`](Events.md).
 - **Boot** - SRAM is volatile, so the chip starts empty and a hardware loader fills it. The loader is a small FSM (not a program), as it has to write the instruction memory, which a program cannot do, and it needs no arbitration as the threads are held in reset while it runs.
     - (TENTATIVE) A few fixed pins (clock, data, enable) feed the loader. It takes a write command (which memory, address, length, payload) and a final "go" command, which carries the entry PC of each thread and a thread enable mask. It is reset-triggered, so a reset reloads the firmware. After loading, the pins are normal pins.
     - (TENTATIVE) The loader can write the data memory as well as the instruction memory, so constant tables can be loaded with the firmware.

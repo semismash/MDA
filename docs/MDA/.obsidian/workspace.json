@@ -13,12 +13,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "Processor Architecture/Events.md",
+                "file": "Instruction Set and Assembly/Instruction Encoding.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "Events"
+              "title": "Instruction Encoding"
             }
           }
         ]
@@ -190,18 +190,18 @@
   },
   "active": "4b13717d8e00b30b",
   "lastOpenFiles": [
-    "Processor Architecture/I-O Interface.md",
-    "Processor Architecture/Events.md",
-    "Processor Architecture/Core Components.md",
-    "Instruction Set and Assembly/Instruction Encoding.md",
-    "Instruction Set and Assembly/Instruction Set.md",
     "Instruction Set and Assembly/Assembly.md",
-    "Developer Specific Notes/Possible Features.md",
+    "Instruction Set and Assembly/Instruction Set.md",
+    "Instruction Set and Assembly/Instruction Encoding.md",
+    "Processor Architecture/I-O Interface.md",
+    "Processor Architecture/Core Components.md",
     "Introduction.md",
+    "Links and Resources.md",
     "Processor Architecture/Threading.md",
+    "Processor Architecture/Events.md",
+    "Developer Specific Notes/Possible Features.md",
     "Developer Specific Notes/I am very angry and I want to break something.md",
     "Developer Specific Notes/Yapping.md",
-    "Links and Resources.md",
     "Processor.md",
     "().md",
     "Untitled.md",

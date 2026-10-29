@@ -5,7 +5,7 @@ The MDA ISA is a minimalist dual-nature instruction set which merges CPU operati
 - Registers and data are 32 bits wide, with 8 GPRs per thread.
 - Instructions can set flags, as stored in the `FLAGS` register.
     - The three basic flags are Zero `Z`, Negative `N`, and Carry `C`
-    - In addition to these, the `FLAGS` register also holds event flags. There are 16 flag slots in total, all local to a thread. The flag layout is given in the [`Events.md`](https://claude.ai/Processor%20Architecture/Events.md) file. There are a total of 35 instructions in the MDA instruction set, plus pseudo-instructions which assemble to one or more of them. _NOTE: The encoding of the instructions is not part of this file, it is defined in `Instruction_Encoding.md`._
+    - In addition to these, the `FLAGS` register also holds event flags. There are 16 flag slots in total, all local to a thread. The flag layout is given in the [`Events.md`](../Processor%20Architecture/Events.md)) file. There are a total of 35 instructions in the MDA instruction set, plus pseudo-instructions which assemble to one or more of them. _NOTE: The encoding of the instructions is not part of this file, it is defined in [`Instruction_Encoding.md`](Instruction%20Encoding.md)._
 
 ## Instruction Types
 
@@ -69,8 +69,8 @@ Instructions are classified into the following types -
 |`lli`|2 slots (suffix)|Load lower immediate. Loads a 24-bit immediate, zero extended, into the destination register. The immediate is made of 8 bits in the instruction, and the 16-bit suffix halfword that follows it.|
 |`lui`|1 slot|Load upper immediate. Updates the upper 8 bits (`[31:24]`) of the destination register with the 8-bit immediate, and keeps the lower 24 bits.|
 
-- A full 32-bit constant is built with `lli` followed by `lui`, which the assembler provides as the pseudo-instruction `$li32`.
-- The suffix halfword is not a separate instruction. It is read as part of `lli`, in the second slot of the thread, so the instruction takes 6 cycles in total, deterministically. A jump that lands on a suffix halfword decodes it as an ordinary instruction (most likely an illegal instruction, see `Events.md`), and the assembler rejects an `lli` in the last instruction address, as the suffix would wrap around to address 0.
+- A full 32-bit constant is built with `lli` followed by `lui`, which the assembler provides as the pseudo-instruction `$li`.
+- The suffix halfword is not a separate instruction. It is read as part of `lli`, in the second slot of the thread, so the instruction takes 6 cycles in total, deterministically. A jump that lands on a suffix halfword decodes it as an ordinary instruction (most likely an illegal instruction, see [`Events.md`](../Processor%20Architecture/Events.md)), and the assembler rejects an `lli` in the last instruction address, as the suffix would wrap around to address 0.
 - Negative constants are made using `xori` with -1, or `addi`.
 - There are no PC-relative address instructions (`alipc` and `auipc` were dropped). Code is loaded at fixed addresses, so labels can be built with `lli`, and a linking jump can be used to read the PC.
 - Jumps -
@@ -105,7 +105,7 @@ Instructions are classified into the following types -
 - All memory accesses are unsigned (i.e. there are no signed loads). They can access one byte or one word at a time. Addresses are byte addresses.
 - (TENTATIVE) The size of the data memory depends on the SRAM macro used. Addresses are not wrapped. Any access outside of the memory is an out-of-bounds fault.
 - Word accesses must be aligned to a word (4 bytes), a misaligned access is a fault.
-- Faults - A faulting access still completes in its normal slot, so timing is never affected. A faulting store is suppressed (memory is not changed), and a faulting load returns 0 to `rd`. In both cases, the thread's `ERR` flag is set along with the fault cause (see [`Events.md`](https://claude.ai/Processor%20Architecture/Events.md)).
+- Faults - A faulting access still completes in its normal slot, so timing is never affected. A faulting store is suppressed (memory is not changed), and a faulting load returns 0 to `rd`. In both cases, the thread's `ERR` flag is set along with the fault cause (see [`Events.md`](../Processor%20Architecture/Events.md)).
 - Offsets - Offsets are unsigned and scaled by the access size, e.g. a 5-bit offset reaches 31 bytes with a byte access, but 31 words with a word access.
 - Sub-types include -
 
@@ -120,11 +120,11 @@ Instructions are classified into the following types -
 
 #### Inter-thread Signalling
 
-- Threads signal each other using doorbells, rung by `flg` (see below), and pass data through the shared data memory (see `Threading.md`). There are no dedicated inter-thread read and write instructions.
+- Threads signal each other using doorbells, rung by `flg` (see below), and pass data through the shared data memory (see [`Threading.md`](../Processor%20Architecture/Threading.md)). There are no dedicated inter-thread read and write instructions.
 
 #### Spatial Instructions
 
-- Spatial Instructions are used to communicate with the I/O ports within the processor. The details of the pins, ownership and the shift engine are given in [`I-O_Interface.md`](https://claude.ai/Processor%20Architecture/I-O_Interface.md). The following spatial instructions are included within the ISA -
+- Spatial Instructions are used to communicate with the I/O ports within the processor. The details of the pins, ownership and the shift engine are given in [`I-O Interface.md`](../Processor%20Architecture/I-O%20Interface.md). The following spatial instructions are included within the ISA -
 
 |Instruction|Parameters|Operation|
 |---|---|---|
@@ -141,36 +141,36 @@ Instructions are classified into the following types -
 
 #### Temporal & Event Instructions
 
-- Temporal instructions are used for temporal control, and add deterministic delays within the processor's execution. Event instructions observe events (see [`Events.md`](https://claude.ai/Processor%20Architecture/Events.md)).
+- Temporal instructions are used for temporal control, and add deterministic delays within the processor's execution. Event instructions observe events (see [`Events.md`](../Processor%20Architecture/Events.md)).
 - The following temporal and event instructions are -
 
-|Instruction|Parameters|Operation|
-|---|---|---|
-|`dl`|`#cycles`|Put a processor's thread to sleep for IMM clock cycles.|
-|`dlrg`|`rs1, #offset`|Put a processor's thread to sleep for RS1 + IMM (offset) clock cycles. `rs1` is a 32-bit count, so a thread can sleep for a long time.|
-|`waitev`|`rs1, mode`|Put a processor's thread to sleep until the flags selected by the mask in `rs1` meet a condition (any or all selected flags set or clear), optionally consuming the sticky flags when it wakes up.|
+| Instruction | Parameters     | Operation                                                                                                                                                                                          |     |
+| ----------- | -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --- |
+| `dl`        | `#cycles`      | Put a processor's thread to sleep for IMM clock cycles.                                                                                                                                            |     |
+| `dlrg`      | `rs1, #offset` | Put a processor's thread to sleep for RS1 + IMM (offset) clock cycles. `rs1` is a 32-bit count, so a thread can sleep for a long time.                                                             |     |
+| `waitev`    | `rs1, mode`    | Put a processor's thread to sleep until the flags selected by the mask in `rs1` meet a condition (any or all selected flags set or clear), optionally consuming the sticky flags when it wakes up. |     |
 
-- The true delay of `dl` and `dlrg` may be 0-2 cycles more than the instructed delay, as a thread always wakes up in its own slot (see `Threading.md`).
+- The true delay of `dl` and `dlrg` may be 0-2 cycles more than the instructed delay, as a thread always wakes up in its own slot (see [`Threading.md`](../Processor%20Architecture/Threading.md)).
 
 #### Configuration & Signalling Instructions
 
 - These instructions configure the I/O and event hardware, and signal other threads.
 
-|Instruction|Parameters|Operation|
-|---|---|---|
-|`cfg`|`#target, rs1`|Configure the issuing thread's own pins, shift engine or timer. The target is selected by the immediate, and the value is taken from `rs1`. The targets are given in [`I-O_Interface.md`](https://claude.ai/Processor%20Architecture/I-O_Interface.md).|
-|`flg`|`#mask` (TENTATIVE)|(TENTATIVE) Acknowledges (clears) sticky flags of the issuing thread - `ERR` (with its cause), `OVR`, `MSG_N` and `MSG_P` - or rings the doorbell of the next or previous thread. It is the only instruction that writes a flag of another thread, and it can only set that thread's doorbell flag.|
+| Instruction | Parameters          | Operation                                                                                                                                                                                                                                                                                           |
+| ----------- | ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `cfg`       | `#target, rs1`      | Configure the issuing thread's own pins, shift engine or timer. The target is selected by the immediate, and the value is taken from `rs1`. The targets are given in [`I-O Interface.md`](../Processor%20Architecture/I-O%20Interface.md).                                                          |
+| `flg`       | `#mask` (TENTATIVE) | (TENTATIVE) Acknowledges (clears) sticky flags of the issuing thread - `ERR` (with its cause), `OVR`, `MSG_N` and `MSG_P` - or rings the doorbell of the next or previous thread. It is the only instruction that writes a flag of another thread, and it can only set that thread's doorbell flag. |
 
 #### Pseudo-instructions
 
 - Pseudo-instructions are written with a `$` prefix, as they may assemble to more than one instruction, which changes the cycle count. The following pseudo-instructions are provided -
 
-|Pseudo-instruction|Assembles to|
+| Pseudo-instruction  |Assembles to|
 |---|---|
-|`$sub rd, rs1, rs2`|`xori` with -1 on `rs2`, `addi` 1, then `add` (3 instructions, needs a scratch register when `rd` is also a source)|
-|`$not rd, rs1`|`xori rd, rs1, -1`|
-|`$mv rd, rs1`|Copies a register (e.g. `addi rd, rs1, 0`)|
-|`$li32 rd, imm`|`lli` followed by `lui`|
-|`$waitp`|(TENTATIVE) Wait for a pin edge, to be defined with the assembly language|
+| `$sub rd, rs1, rs2` |`xori` with -1 on `rs2`, `addi` 1, then `add` (3 instructions, needs a scratch register when `rd` is also a source)|
+| `$not rd, rs1`      |`xori rd, rs1, -1`|
+| `$mv rd, rs1`       |Copies a register (e.g. `addi rd, rs1, 0`)|
+| `$li rd, imm`       |`lli` followed by `lui`|
+| `$waitp`            |(TENTATIVE) Wait for a pin edge, to be defined with the assembly language|
 
-	- The assembly syntax is defined in `Assembly.md`.
+- The assembly syntax is defined in [`Assembly.md`](Assembly.md).
