@@ -10,6 +10,7 @@ The Minimalist Deterministic Architecture (MDA) is a CPU architecture aimed to p
 - Timing Model - 100% Deterministic. This avoids many stalls and makes sure that every single instruction is predictable. Faults and events never change the timing of any thread other than the one waiting on them.
 - Events and Faults - Hardware state changes are latched into per-thread flags and handled by software (no dedicated interrupts, a thread can be used as an event handler). Threads signal each other using doorbells and shared memory.
 - I/O - 24 pins with per-thread ownership and per-pin watchers. Autonomous shift engines with a programmable divisor give cycle-exact bit timing, with the protocols themselves in firmware.
+- Target Clock Speed - 50 MHz
 
 ### Instructions and Memory
 
