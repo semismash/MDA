@@ -29,3 +29,51 @@ Inplementation decisions -
 
 other -
 > need to evaluate UART, SPI, I2C for all, both master and slave, want to make sure that any theoretical protocol can be supported, including
+
+ISA ENCODING CLASSIFICATION - (35/35 covered)
+RR   Type - Reg-reg instructions w/ rd, (add, xor, and, or, cmp, cmpa, shl, shr)
+RI-A Type - Reg-imm instructions w/ rd, ALU op type (addi, xori, shli, shri)
+RI-Z Type - Reg-imm instructions w/ rd, other type (lb, lw, jrg)
+DI-L Type - Direct imm type instructions w/ rd, load imm type (lbi, lli, lui)
+DI-Z Type - Direct imm type instructions w/ rd, other type (jmp, pull, rpin)
+NX   Type - No rd, only imm, (jnl, jof, inp, outp, dl, flg)
+RX   Type - No rd, imm and rs1 (joc, push, wpin, dlrg, waitev, cfg)
+SX   Type - No rd, imm, rs1 and rs2 (sb, sw)
+SUFFIX Type - 16-bit instruction word suffix, comes after lli specifically.
+
+ENCODING FIELDS -
+OPCODE - [2:0] - OpCode bits to identify instruction type and encoding
+FUNCT - [5:3] or [4:3] - Further classify instruction type within specific encoding
+RD - [15:13] - 3-bit Destination Register address field
+RS1 - [12:10] - 3-bit Source Register 1 address field
+RS2 - [9:7] - 3-bit Source Register 2 address field
+IMM - REMAINING - Immediate value, split up across remaining bits for each encoding type
+
+ENCODING FORMATS -
+RR Type - [(15:13) RD, (12:10) RS1, (9:7) RS2, (6:6) IMM, (5:3) FUNCT, (2:0) OPCODE]: IMM[0] = WB (1 bit immediate, 0 bit effective)
+RI Type - [(15:13) RD, (12:10) RS1, (9:5) IMM[4:0], (4:3) FUNCT, (2:0) OPCODE]: IMM SIZE = 5 bits (4 bits in ALU instructions since WB bit)
+DI Type - [(15:13) RD, (12:5) IMM[7:0], (4:3) FUNCT, (2:0) OPCODE]: IMM SIZE = 8 bits
+NX Type - [(15:6) IMM[9:0], (5:3) FUNCT, (2:0) OPCODE]: IMM SIZE = 10 bits
+RX Type - [(15:13) IMM[6:4], (12:10) RS1, (9:6) IMM[3:0], (5:3) FUNCT, (2:0) OPCODE] = 7 bits
+SX Type - [(15:13) IMM[3:1], (12:10) RS1, (9:7) RS2, (6:5) IMM[1:0], (4:3) FUNCT, (2:0) OPCODE] = 5 bits
+
+OPCODES -
+RR   Type - 000
+RI-A Type - 010
+RI-Z Type - 011
+DI-L Type - 110
+DI-Z Type - 111
+NX   Type - 001
+RX   Type - 101
+SX   Type - 100
+
+FUNCT - 
+RR   Type - ADD (000), XOR (001), AND (110), OR (111), CMP (100), CMPA (101), SHL (010), SHR (011)
+RI-A Type - ADDI (00), XORI (01), SHL (10), SHR (11)
+RI-Z Type - LB (00), LW (01), JRG (10)
+DI-L Type - LBI (01), LLI (11), LUI (00)
+DI-Z Type - JMP (00), PULL (01), RPIN (11)
+NX   Type - JNL (010), JOF (011), INP (000), OUTP (001), DL (100), FLG (111)
+RX   Type - JOC (010), PUSH (001), WPIN (011), DLRG (100), WAITEV (110), CFG (111)
+SX   Type - SB (00), SW (01)
+

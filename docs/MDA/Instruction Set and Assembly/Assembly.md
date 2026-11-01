@@ -46,7 +46,7 @@ MDA ASM instructions are written in formats, given by the examples below.
 - Register-register operation - `add r0, r5, r6` (Add r5 and r6, and store in r0)
 - Register-immediate operation - `shli r1, r2, 5` (Shift r2 value left 5 bits, and store in r1)
 - Constant loading - `lbi r1, 200` (load the 8-bit constant 200 into r1)
-- Jump operation - `jmp r4, my_label` (Jump to address at label_name and store return address + 1 in r4)
+- Jump operation - `jmp r4, my_label` (Jump to address at label_name and store the address of the next instruction in r4)
 - Label definition - `my_label:` (subject to jump distance restrictions)
 - No WB - `xori @na, r7, r2` (XOR r7 and r2, don't store result, update flags)
 - Flag jump - `jof Z, @inv, my_label` (Jump if the `Z` flag is not set)
@@ -58,7 +58,25 @@ MDA ASM instructions are written in formats, given by the examples below.
 - Pseudo-instruction - `$mv r2, r3` (Copy data from r3 to r2)
 - Comments - `cmpa r0, r2, r7 ; This is a comment!`
 - Immediates are written without a prefix (e.g. `inp 8`, `dl 12`), the `#` prefix is only used for pins and `cfg` targets.
-- (TENTATIVE) The range of every immediate follows from the encoding, and will be added here once the encoding is final.
+- The range of every immediate is given in the table below. A jump offset is counted in instruction addresses (halfwords, so an `lli` counts as 2) from the next instruction, and the assembler works it out from the label.
+
+|Instruction|Immediate|Range|
+|---|---|---|
+|`addi`, `xori`|Signed 4 bits|-8 to 7|
+|`shli`, `shri`|Shift amount|0 to 15|
+|`lbi`, `lui`|Unsigned 8 bits|0 to 255|
+|`lli`|Unsigned 24 bits|0 to 16777215|
+|`lb`, `sb`|Offset, in bytes|0 to 31|
+|`lw`, `sw`|Offset, in words (scaled by 4)|0 to 31|
+|`jrg`|Signed 5 bits|-16 to 15|
+|`jmp`|Signed 8 bits|-128 to 127|
+|`jof`, `joc`|Signed 6 bits|-32 to 31|
+|`jnl`|Signed 10 bits (wraps around the instruction memory)|-512 to 511|
+|`pull`, `push`|Shift amount|0 to 31|
+|`inp`, `outp`|Count|1 to 32|
+|`dl`|Cycles|0 to 1023|
+|`dlrg`|Offset added to `rs1`|0 to 127|
+|`rpin`, `wpin`|Pin number|0 to 23|
 
 ### Instructions
 
@@ -104,7 +122,8 @@ The 35 assembly instructions are as follows -
     - `lbi` loads an 8-bit constant, `lli` a 24-bit constant (the assembler emits the suffix halfword by itself), and `lui` sets the upper 8 bits. A 32-bit constant is made with `$li`.
     - `inp` and `outp` only take a count, the pins come from the engine configuration set by `cfg` (TENTATIVE).
     - `joc` takes its flag mask from a register, and only the low 16 bits of it are used (so does `waitev`).
-    - `jof` and `joc` reach ±32 and `jmp` reaches ±128, in units of instruction memory addresses (halfwords, so an `lli` counts as 2), and `jnl` reaches the whole instruction memory. For the plain instructions, a label that is out of range is an assembler error, it is never fixed silently. The pseudo-instructions below choose the far form by themselves.
+    - `jof` with `@inv` and the four modes of `joc` are variants of the same instructions (see `Instruction_Encoding.md`), so the mnemonics do not change.
+    - `jof` and `joc` reach -32 to 31 and `jmp` reaches -128 to 127, in units of instruction memory addresses (halfwords, so an `lli` counts as 2) from the next instruction, and `jnl` (-512 to 511, wrapping around) reaches the whole instruction memory. For the plain instructions, a label that is out of range is an assembler error, it is never fixed silently. The pseudo-instructions below choose the far form by themselves.
     - The `cfg` targets are `#PIN`, `#WATCH`, `#ENG_DIV`, `#ENG_CTL`, `#ENG_ABORT` and `#TMR`. (TENTATIVE) The packing of the value in `rs1` follows the encoding of the fields in `I-O_Interface.md`, and the assembler may provide helper constants for it.
 
 ### Register Conventions (ABI)
@@ -137,7 +156,7 @@ The 35 assembly instructions are as follows -
 
 |Pseudo-instruction|Assembles to|Usage|Cycle cost|Flags|
 |---|---|---|---|---|
-|`$nop`|`jnl` to the next instruction|No operation, creates a bubble. Touches no register and no flag|1 slot|None|
+|`$nop`|`jnl` with an offset of 0 (to the next instruction)|No operation, creates a bubble. Touches no register and no flag|1 slot|None|
 |`$mv rd, rs1`|`addi rd, rs1, 0`|Move contents from one register to another|1 slot|Z, N, C|
 |`$not rd, rs1`|`xori rd, rs1, -1`|Inverts all bits in a register|1 slot|Z, N|
 |`$neg rd, rs1`|`xori rd, rs1, -1`, then `addi rd, rd, 1`|Two's complement negation|2 slots|Z, N, C|
@@ -149,7 +168,7 @@ The 35 assembly instructions are as follows -
 |`$ret`|`jrg rad, rad, 0`|Return from a subroutine (`jrg` always links, so `rad` is overwritten)|1 slot|None|
 |`$spush rs`|`addi rsp, rsp, -4`, then `sw rs, 0(rsp)`|Push a register onto the stack|2 slots|Z, N, C|
 |`$spop rd`|`lw rd, 0(rsp)`, then `addi rsp, rsp, 4`|Pop a register from the stack|2 slots|Z, N, C|
-|`$halt`|`jnl` to itself|Spin forever, the thread keeps its slot|1 slot per loop|None|
+|`$halt`|`jnl` to itself (an offset of -1)|Spin forever, the thread keeps its slot|1 slot per loop|None|
 |`$park rt`|`lli rt, M_MSG_N \| M_MSG_P`, then `waitev rt, @any, @set`, then `jnl` back to the `waitev`|Park a thread until another thread rings its doorbell, going back to sleep if woken for no reason|3 slots, then asleep|None|
 |`$waitp rt, #pin, @mode`|Sequence given below|Sleep until an event on one pin. The mode is `@posedge`, `@negedge`, `@anyedge`, `@high` or `@low`|About 12 slots plus the wait|Z, N, C|
 
@@ -174,7 +193,7 @@ The 35 assembly instructions are as follows -
 |`$bnez rs, label`|`addi @na, rs, 0`, then `jof Z, @inv, label`|
 
 - The compare and branch pseudo-instructions take 2 slots when the label is in range. If it is out of range they use the far form, which is 2 slots when not taken and 3 when taken. They rely on `cmp` and `cmpa` setting both `N` and `Z` to 0 when the compare is false (see `Instruction_Set.md`).
-- `$spush` and `$spop` are named so as not to be confused with the `push` and `pull` instructions, which move data to and from the shift registers. They assume the immediates -4 and 4 fit in `addi`, which depends on the encoding.
+- `$spush` and `$spop` are named so as not to be confused with the `push` and `pull` instructions, which move data to and from the shift registers. The immediates -4 and 4 fit in the 4-bit range of `addi` (-8 to 7).
 - (TENTATIVE) `$waitp` is one-shot, it leaves the pin's watcher off. It loops, because `PE` is the OR of all of the pins the thread owns, so an event on another pin can wake it. The pseudo-instruction is expensive, for timing critical code (e.g. a UART receiver) use the explicit instructions instead.
 
 ```
