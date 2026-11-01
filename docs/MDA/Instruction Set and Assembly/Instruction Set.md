@@ -83,7 +83,7 @@ Instructions are classified into the following types -
 |`jrg`|Performs an unconditional jump to `rs1` (the lower bits that fit the PC) + IMM (5 bits, sign extended) and saves the return address + 1 to `rd`.|
 |`jnl`|Performs a non-linking unconditional jump (no `rd`), with enough reach to hit any instruction address. Used for far jumps.|
 |`jof`|Performs a conditional jump to PC + IMM without saving the return address. Checks one specific flag (out of the 16), and jumps to it if it's `1` (or if it's `0` if the invert bit in the instruction is high).|
-|`joc`|Performs a conditional jump to PC + IMM without saving the return address. The flag mask is taken from the register `rs1`, so any of the flags can be selected. The selected flags are checked according to a 2-bit mode, and the jump is performed if the condition holds.|
+|`joc`|Performs a conditional jump to PC + IMM without saving the return address. The flag mask is taken from the register `rs1` (only its low 16 bits are used), so any of the flags can be selected. The selected flags are checked according to a 2-bit mode, and the jump is performed if the condition holds.|
 
 - The modes of `joc` are - `00` all selected flags set, `01` any selected flag set, `10` no selected flag set, `11` not all selected flags set. `waitev` uses the same four conditions (see `Events.md`).
 - Conditional jumps (`jof` and `joc`) reach ±32 instructions. A farther conditional jump is expanded by the assembler into an inverted conditional jump over a `jnl` (flagged using the `$` prefix, as it changes the cycle count).
@@ -109,17 +109,14 @@ Instructions are classified into the following types -
 - Offsets - Offsets are unsigned and scaled by the access size, e.g. a 5-bit offset reaches 31 bytes with a byte access, but 31 words with a word access.
 - Sub-types include -
 
-|Instruction|Operation|
-|---|---|
-|`lb`|Loads one byte from the memory, zero extended, into specified register `rd`. Calculates the memory address from `rs1` + IMM.|
-|`lw`|Loads one word (4 bytes) from the memory into specified register `rd`. Calculates the memory address from `rs1` + IMM. The address must be word aligned.|
-|`sb`|Stores one byte from specified register `rs2` into memory. Calculates the memory address from `rs1` + IMM.|
-|`sw`|Stores one word (4 bytes) from specified register `rs2` into memory. Calculates the memory address from `rs1` + IMM. The address must be word aligned.|
+| Instruction | Operation                                                                                                                                                |
+| ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `lb`        | Loads one byte from the memory, zero extended, into specified register `rd`. Calculates the memory address from `rs1` + IMM.                             |
+| `lw`        | Loads one word (4 bytes) from the memory into specified register `rd`. Calculates the memory address from `rs1` + IMM. The address must be word aligned. |
+| `sb`        | Stores one byte from specified register `rs2` into memory. Calculates the memory address from `rs1` + IMM.                                               |
+| `sw`        | Stores one word (4 bytes) from specified register `rs2` into memory. Calculates the memory address from `rs1` + IMM. The address must be word aligned.   |
 
 - Half-word loads and stores (`lh` and `sh`) are not part of the ISA for now.
-
-#### Inter-thread Signalling
-
 - Threads signal each other using doorbells, rung by `flg` (see below), and pass data through the shared data memory (see [`Threading.md`](../Processor%20Architecture/Threading.md)). There are no dedicated inter-thread read and write instructions.
 
 #### Spatial Instructions
@@ -144,33 +141,19 @@ Instructions are classified into the following types -
 - Temporal instructions are used for temporal control, and add deterministic delays within the processor's execution. Event instructions observe events (see [`Events.md`](../Processor%20Architecture/Events.md)).
 - The following temporal and event instructions are -
 
-| Instruction | Parameters     | Operation                                                                                                                                                                                          |     |
-| ----------- | -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --- |
-| `dl`        | `#cycles`      | Put a processor's thread to sleep for IMM clock cycles.                                                                                                                                            |     |
-| `dlrg`      | `rs1, #offset` | Put a processor's thread to sleep for RS1 + IMM (offset) clock cycles. `rs1` is a 32-bit count, so a thread can sleep for a long time.                                                             |     |
-| `waitev`    | `rs1, mode`    | Put a processor's thread to sleep until the flags selected by the mask in `rs1` meet a condition (any or all selected flags set or clear), optionally consuming the sticky flags when it wakes up. |     |
+|Instruction|Parameters|Operation||
+|---|---|---|---|
+|`dl`|`#cycles`|Put a processor's thread to sleep for IMM clock cycles.||
+|`dlrg`|`rs1, #offset`|Put a processor's thread to sleep for RS1 + IMM (offset) clock cycles. `rs1` is a 32-bit count, so a thread can sleep for a long time.||
+|`waitev`|`rs1, mode`|Put a processor's thread to sleep until the flags selected by the mask in `rs1` meet a condition (any or all selected flags set or clear), optionally consuming the sticky flags when it wakes up.||
 
 - The true delay of `dl` and `dlrg` may be 0-2 cycles more than the instructed delay, as a thread always wakes up in its own slot (see [`Threading.md`](../Processor%20Architecture/Threading.md)).
 
-#### Configuration & Signalling Instructions
+#### Configuration & Signaling Instructions
 
 - These instructions configure the I/O and event hardware, and signal other threads.
 
-| Instruction | Parameters          | Operation                                                                                                                                                                                                                                                                                           |
-| ----------- | ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `cfg`       | `#target, rs1`      | Configure the issuing thread's own pins, shift engine or timer. The target is selected by the immediate, and the value is taken from `rs1`. The targets are given in [`I-O Interface.md`](../Processor%20Architecture/I-O%20Interface.md).                                                          |
-| `flg`       | `#mask` (TENTATIVE) | (TENTATIVE) Acknowledges (clears) sticky flags of the issuing thread - `ERR` (with its cause), `OVR`, `MSG_N` and `MSG_P` - or rings the doorbell of the next or previous thread. It is the only instruction that writes a flag of another thread, and it can only set that thread's doorbell flag. |
-
-#### Pseudo-instructions
-
-- Pseudo-instructions are written with a `$` prefix, as they may assemble to more than one instruction, which changes the cycle count. The following pseudo-instructions are provided -
-
-| Pseudo-instruction  |Assembles to|
-|---|---|
-| `$sub rd, rs1, rs2` |`xori` with -1 on `rs2`, `addi` 1, then `add` (3 instructions, needs a scratch register when `rd` is also a source)|
-| `$not rd, rs1`      |`xori rd, rs1, -1`|
-| `$mv rd, rs1`       |Copies a register (e.g. `addi rd, rs1, 0`)|
-| `$li rd, imm`       |`lli` followed by `lui`|
-| `$waitp`            |(TENTATIVE) Wait for a pin edge, to be defined with the assembly language|
-
-- The assembly syntax is defined in [`Assembly.md`](Assembly.md).
+| Instruction | Parameters     | Operation                                                                                                                                                                                                                                                                               |
+| ----------- | -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `cfg`       | `#target, rs1` | Configure the issuing thread's own pins, shift engine or timer. The target is selected by the immediate, and the value is taken from `rs1`. The targets are given in [`I-O Interface.md`](../Processor%20Architecture/I-O%20Interface.md).                                              |
+| `flg`       | `#mask`        | Acknowledges (clears) sticky flags of the issuing thread - `ERR` (with its cause), `OVR`, `MSG_N` and `MSG_P` - or rings the doorbell of the next or previous thread. It is the only instruction that writes a flag of another thread, and it can only set that thread's doorbell flag. |

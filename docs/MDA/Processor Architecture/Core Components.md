@@ -22,4 +22,3 @@ Given below are the core components of MDA. Most of this is tentative, and the a
 - **Clock** - Targeting 25-50 MHz until the real limit is verified.
 - **Area (estimates for a 6x4 Tiny Tapeout IHP design)** - 24 tiles of about 200um x 150um, and roughly 1K logic cells (about 320 flops) per tile. Roughly 24K logic cells nominal, 15-18K realistically. The design is estimated at 8-10K cells, or about 10-11 tiles, plus the SRAM macros.
     - (TENTATIVE) A larger 8x4 design (about 30% more area) may become available, which is why memory sizes are kept parametrizable.
-- **Deferred** - Dual core (6 threads), variable length instructions other than the constant-loading suffix, and half-word loads and stores (`lh` and `sh`).

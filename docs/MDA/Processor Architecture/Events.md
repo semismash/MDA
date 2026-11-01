@@ -9,7 +9,7 @@ Events are changes in the hardware state that can be observed in the CPU. They d
 ### Event Flags
 
 - Event state is held in the `FLAGS` register, so events are observed using the same conditional jumps as the ALU flags (`jof`, `joc`), and can be waited on using `waitev`. Flags are of two kinds -
-    - **Sticky** - Set by hardware (or by a doorbell ring from another thread), and cleared only by software (using `flg`, by consuming them in `waitev`, or by re-arming the thing that sets them). Examples - pin edge events, `TMR`, `ERR`, `OVR`, doorbells.
+    - **Sticky** - Holds its value until it is cleared or overwritten. Event flags are set by hardware (or by a doorbell ring from another thread), and cleared only by software (using `flg`, by consuming them in `waitev`, or by re-arming the thing that sets them). Examples - pin edge events, `TMR`, `ERR`, `OVR`, doorbells. The ALU flags (`Z`, `N`, `C`) are sticky as well, but they are set by an instruction instead of by a hardware event, and they are overwritten by the next instruction that sets them.
     - **Live** - Mirror the current hardware state, and clear themselves. Examples - pin level conditions, `PE`, ISR/OSR status.
 - All flags are local to a thread, each thread has its own view of them. There are no global flags. The doorbell state is physically shared between threads (6 bits), but each thread only sees its own two incoming bits (see [`Threading.md`](Threading.md)).
 - Every thread sees the flags as they were at the start of its own slot.
@@ -17,25 +17,26 @@ Events are changes in the hardware state that can be observed in the CPU. They d
 
 ### Flag Layout
 
-- There are 16 flag slots, all reachable by `jof` and `joc`, of which 13 are used and 3 are spare. `joc` and `waitev` take the flag numbering as a mask in a register.
+- There are 16 flag slots, all reachable by `jof` and `joc`, of which 14 are used and 2 are spare. `joc` and `waitev` take the flag numbering as a mask in a register. Only the low 16 bits of the mask (one per flag slot) are checked, the upper bits are ignored, and the spare flags read as 0.
 - (TENTATIVE) The flag numbering is illustrative and may change. The most frequently branched flags should stay in the lower 16.
 
 |Index|Flag|Kind|Set by|Cleared by|
 |---|---|---|---|---|
-|0|`Z`|ALU|Any flag-setting instruction, if the result is all 0|Overwritten by the next flag-setting instruction|
-|1|`N`|ALU|Any flag-setting instruction, if the MSB of the result is 1|Overwritten by the next flag-setting instruction|
-|2|`C`|ALU|Carry of `add` and `addi`, last bit shifted out by shifts|Overwritten by the next instruction that sets it|
+|0|`Z`|Sticky (ALU)|Any flag-setting instruction, if the result is all 0|Overwritten by the next flag-setting instruction|
+|1|`N`|Sticky (ALU)|Any flag-setting instruction, if the MSB of the result is 1|Overwritten by the next flag-setting instruction|
+|2|`C`|Sticky (ALU)|Carry of `add` and `addi`, last bit shifted out by shifts|Overwritten by the next instruction that sets it|
 |3|`ERR`|Sticky|Any fault in this thread|`flg` acknowledge (also clears the cause)|
 |4|`ERRC0`|Sticky|Bit 0 of the fault cause, latched with the first fault|Cleared together with `ERR`|
 |5|`ERRC1`|Sticky|Bit 1 of the fault cause, latched with the first fault|Cleared together with `ERR`|
-|6|`ISR_RDY`|Live|Shift engine completes an input word|`pull`, or launching `inp`|
-|7|`OSR_EMPTY`|Live|Shift engine finishes shifting out a word, and at reset|`push`|
-|8|`MSG_N`|Sticky|Doorbell rung by the next thread|`flg` acknowledge, or `waitev` consume|
-|9|`MSG_P`|Sticky|Doorbell rung by the previous thread|`flg` acknowledge, or `waitev` consume|
-|10|`PE`|Live (derived)|OR of the event bits of all pins owned by this thread|Clearing the pin event bits (`rpin` with clear), re-arming the watcher, ownership transfer|
-|11|`OVR`|Sticky|An event or data was lost (see overrun rules below)|`flg` acknowledge|
-|12|`TMR`|Sticky|The thread's timer expires|`cfg` re-arm or disarm of the timer, or `waitev` consume|
-|13-15|Spare|-|-|-|
+|6|`ERRC2`|Sticky|Bit 2 of the fault cause, latched with the first fault|Cleared together with `ERR`|
+|7|`ISR_RDY`|Live|Shift engine completes an input word|`pull`, or launching `inp`|
+|8|`OSR_EMPTY`|Live|Shift engine finishes shifting out a word, and at reset|`push`|
+|9|`MSG_N`|Sticky|Doorbell rung by the next thread|`flg` acknowledge, or `waitev` consume|
+|10|`MSG_P`|Sticky|Doorbell rung by the previous thread|`flg` acknowledge, or `waitev` consume|
+|11|`PE`|Live (derived)|OR of the event bits of all pins owned by this thread|Clearing the pin event bits (`rpin` with clear), re-arming the watcher, ownership transfer|
+|12|`OVR`|Sticky|An event or data was lost (see overrun rules below)|`flg` acknowledge|
+|13|`TMR`|Sticky|The thread's timer expires|`cfg` re-arm or disarm of the timer, or `waitev` consume|
+|14-15|Spare|-|-|-|
 
 - The ALU flag behavior of each instruction is given in [`Instruction Set.md`](../Instruction%20Set%20and%20Assembly/Instruction%20Set.md).
 - The next thread of thread `i` is thread `(i + 1) mod 3`, and the previous thread is `(i - 1) mod 3`.
@@ -80,7 +81,7 @@ Events are changes in the hardware state that can be observed in the CPU. They d
 ### Waiting on Events
 
 - `waitev rs1, mode` puts the thread to sleep until the flags selected by the mask in `rs1` meet a condition. The thread still occupies its slot (executing nothing), hence other threads are never stalled.
-- The mask uses the same flag numbering as `jof` and `joc`. The condition is chosen by two independent fields, and gives exactly the same four conditions as `joc` -
+- The mask uses the same flag numbering as `jof` and `joc`, and only its low 16 bits (one per flag slot) are checked, the upper bits are ignored and the spare flags read as 0. The condition is chosen by two independent fields, and gives exactly the same four conditions as `joc` -
 
 |Fields|Condition|`joc` mode|
 |---|---|---|
@@ -89,19 +90,18 @@ Events are changes in the hardware state that can be observed in the CPU. They d
 |ALL + CLEAR|No selected flag is set|`10`|
 |ANY + CLEAR|Not all selected flags are set|`11`|
 
-- A third field, CONSUME, clears the sticky flags in the mask (that were set at wake up) when the thread wakes.
+- A third field, CONSUME, clears the sticky event flags in the mask (that were set at wake up) when the thread wakes. Only `MSG_N`, `MSG_P` and `TMR` can be consumed. The ALU flags, `ERR`, `OVR` and the live flags are never affected (`ERR` and `OVR` are cleared using `flg`).
 - (TENTATIVE) A 4-bit field is kept reserved for an optional post-event delay of 0-15 cycles, to wake up a precise number of cycles after the event. It must be zero for now.
 - `waitev` does not look at edges, it checks the flag levels as they were at the start of the thread's slot. Edges are turned into sticky flags by the watchers beforehand.
 - Rules -
     - If the condition is already true, `waitev` takes one slot and falls through. A sticky event that arrived earlier is therefore never missed. To wait for a new event, clear the flag first.
     - Otherwise, the thread sleeps and wakes at the first slot whose snapshot meets the condition. The next instruction runs one slot later. The wake up time is a pure function of the event time.
-    - Consume only applies to sticky flags, and is ignored when waiting for CLEAR. Live flags (`ISR_RDY`, `OSR_EMPTY`, `PE`) are never affected. A new event arriving in the same cycle as a consume counts as a new event, the flag stays set.
+    - Consume only applies to `MSG_N`, `MSG_P` and `TMR`, and is ignored when waiting for CLEAR. The ALU flags, `ERR`, `OVR` and the live flags (`ISR_RDY`, `OSR_EMPTY`, `PE`) are never affected. A new event arriving in the same cycle as a consume counts as a new event, the flag stays set.
     - Consuming is useful for waiting on a single flag. When waiting on several flags together, consuming clears the one that woke the thread, so it can no longer be told apart. In that case, wait without consume and dispatch using `jof` on the flags.
     - `PE` is not consumed by `waitev`, since it would hide events from other pins. Pin events are cleared individually using `rpin` with clear.
-    - An empty mask is a fault (cause `10`), and the thread falls through. Waiting forever would be a deadlock with no interrupts to recover from, if that is wanted a thread can spin on a self-jump instead.
+    - An empty mask (low 16 bits all zero) is a fault (cause `101`), and the thread falls through. Waiting forever would be a deadlock with no interrupts to recover from, if that is wanted a thread can spin on a self-jump instead.
     - (TENTATIVE) The latency from a pin edge to the next instruction after `waitev` is roughly 6-8 cycles, to be verified by the reference model.
 - A timeout can be built by including `TMR` in the mask, after starting the timer.
-- `waitp` stays as a pseudo-instruction shortcut for waiting on a pin edge (TENTATIVE, to be defined with the assembly language).
 
 ### Timer
 
@@ -140,20 +140,20 @@ cfg    #TMR, r0             ; disarm
 ### Faults
 
 - Faults are treated as events. A fault never changes the timing of an instruction, which still completes in its normal slot.
-- A fault sets the thread's `ERR` flag, along with a 2-bit cause - `00` misaligned access, `01` out-of-bounds access, `10` I/O fault, `11` illegal instruction.
+- A fault sets the thread's `ERR` flag, along with a 3-bit cause (`ERRC2`, `ERRC1`, `ERRC0`), given in the table below. The cause `111` is reserved.
 - If `ERR` is already set when another fault occurs, the first cause is kept and `OVR` is set. If a single access is both misaligned and out-of-bounds, it is reported as misaligned. Clearing `ERR` also clears the cause.
 - There are no instruction fetch faults. The PC is as wide as the instruction memory address, and wraps around, so every PC value is a valid address.
 - A fault is never required to be handled, `ERR` is a sticky flag that software can look at (using `jof` or `waitev`) or ignore.
 
 |Fault|Trigger|Effect|Cause|
 |---|---|---|---|
-|Misaligned access|`lw` or `sw` on an address that is not word aligned|Store suppressed, load returns 0|`00`|
-|Out-of-bounds access|Any data memory access outside of the memory|Store suppressed, load returns 0|`01`|
-|Bad `cfg`|Reserved target, pin number above 23, pin not owned by the thread, role the pin cannot do, engine write while the engine is busy (except abort)|No effect|`10`|
-|Bad pin access|`wpin` on a pin that is not owned or not in direct mode, `rpin` event modes on a pin that is not owned, `rpin` on an output-only pin|No effect, reads return 0|`10`|
-|Bad engine launch|`inp` or `outp` with no engine pins configured, or while the engine is busy|No effect|`10`|
-|Bad `waitev`|Empty mask|Falls through|`10`|
-|Illegal instruction|Undefined encoding, or reserved bits set|Executes as a NOP|`11`|
+|Misaligned access|`lw` or `sw` on an address that is not word aligned|Store suppressed, load returns 0|`000`|
+|Out-of-bounds access|Any data memory access outside of the memory|Store suppressed, load returns 0|`001`|
+|Bad `cfg`|Reserved target, pin number above 23, pin not owned by the thread, role the pin cannot do, divisor of 0, engine write while the engine is busy (except abort)|No effect|`010`|
+|Bad pin access|`wpin` on a pin that is not owned or not in direct mode, `rpin` event modes on a pin that is not owned, `rpin` on an output-only pin|No effect, reads return 0|`011`|
+|Bad engine launch|`inp` or `outp` with no engine pins configured, or while the engine is busy|No effect|`100`|
+|Bad `waitev`|Empty mask|Falls through|`101`|
+|Illegal instruction|Undefined encoding, or reserved bits set|Executes as a NOP|`110`|
 
 ### Interrupts
 
@@ -174,3 +174,5 @@ rpin r4, #0, @pend_clr      ; read which pins fired, and clear them
 dl 12                       ; wait until the middle of the bit
 rpin r3, #3, @level         ; sample the bit
 ```
+
+- The example is pseudocode. Instructions are scheduled in round robin order, so every consecutive instruction of a thread is scheduled in that thread's next slot, and delays are rounded up to the thread's next slot (see `Threading.md`). The per-thread throughput is therefore at most one instruction per 3 cycles (3 CPI), so a multithreaded approach should be preferred.

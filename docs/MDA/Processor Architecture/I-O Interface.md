@@ -36,7 +36,7 @@ Given below is the I/O interface design for MDA. Anything that is not final is m
 |Watcher mode|`000`-`111`| Pin event detection, see [`Events.md`](Events.md)                                             |
 
 - (TENTATIVE) Two more fields are proposed, to be decided - an **idle level** (what the pin drives from the engine while no transfer is running, e.g. high for UART TX and the SPI clock idle level), and a **gate** input role (the engine only shifts while the gate pin is asserted, e.g. chip select for an SPI slave, so the frame starts and aborts cleanly).
-- **Input synchronization** - Every input pin goes through a 2-flop synchronizer followed by a "previous sample" flop. These are shared by all threads, and are used by `rpin`, the shift engines and the pin watchers (see [`Events.md`](Events.md)).
+- **Input synchronization** - Every input pin goes through a 2 flip-flop synchronizer followed by a "previous sample" flop. These are shared by all threads, and are used by `rpin`, the shift engines and the pin watchers (see [`Events.md`](Events.md)).
 - **Direct access** - `rpin` reads from a pin directly into a register, and `wpin` writes a register directly to a pin. Each such access takes place in the thread's slot, so the timing is quantized to the 3-cycle slot rotation.
     - `wpin rs1, #pin` - Writes bit 0 of `rs1` to the pin (with open-drain on, 1 means release). The pin must be owned by the thread and have the output source `direct`, otherwise it is a fault.
     - `rpin rd, #pin, mode` - Reads from a pin, or from the pin event bits, depending on the mode -

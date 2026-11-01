@@ -1,0 +1,31 @@
+checked -
+> introduction.md (IN) - VERIFIED, NO CHANGES
+> instruction set.md (IS) - CHECKED - REVIEW changes
+> core components.md (CC) - CHECKED - REVIEW changes/suggestions
+> i-o interface.md (IO) - Verifified - REVIEW changes
+> events.md (EV) - Verified - REVIEW changes
+> threading.md (TH) - VERIFIED, NO CHANGES FOR NOW
+
+design decisions
+> (IS) lli - confirm if current mechanism and split with lbi/lli/lui or shpuld instead off smth diff like lli (load bottom 16 bits) and lui (load top 16 bits)
+> (EV) multiple error codes merged into one... is this ok? probably better to add a new ERRC2 bit (assign the flag after ERRC1, and shift all existing flags 1 bit formward)
+> (IS) remove the pseudoinstructions from instruction set.md, add into assembly.md later
+> (IS) removed separate "Inter-Thread Signalling" section, now part of memory access instructions
+> (CC) need to recheck sizes and measurements for core components (like macro), can be done later
+> (CC) removed deferred, kept in Possible Features section
+> (IO) clock pin - should we have a set pin that always corresponds to clock? or should we set it using software? also, for pins in general, do we need specific VCC/GND pins or smth to power the chip?
+> (IO) cfg divisor field - forgot if we discuss 16-bit vs 32-bit, 32-bit divisor may req extra memory but is within the bounds of possibility without requiring extra hardware
+> (EV) clarification - for instructions that use flag masks, should be made that only the bottom n bits of the mask are checked (where n is the number of flag bits, i.e. 16), and the top ones are ignored
+> (EV) removed waitp statement, will be mentioned in the assembly section explicitly
+> (EV) to be worth mentioning, but the Example in waitev is just pseudocode, instructions use round robin scheduling order so every consective instruction is scheduled in the next thread in the cycle, multithreaded approach should be preferred as since per-thread throughput is 3 CPI at max
+> (EV) in flag list, changed ALU flag type categorization from ALU to Sticky (ALU)
+
+
+Inplementation decisions - 
+> suffix instructiona - should be stalled piepline and merged into the target instruction, or shpuld propagate theough pipeline like normal, or use a sepearate system entirely (eg. Suffix will be stored in a specific 16-bit buffer, fetched inst word becomes bubble, insturction whcih uses suffix requests suffix from buffer in ex stage)
+> mem access protocol - need a but of discuss how to handle synchronous reads and writes (theoretically throughput reducing due to reads if we use SSRAM should not be an issue as 3 cycle thread spacing eliminates need for stalling),  still evalute implementing mem access protocol to catch invalid reads and writes (use very optimized axi4lite derivative that assumes single cycle reads and writes)
+> control hazards handling - guessing shouldn't be an issue, since PC for specific instruction will already be updated by the time the next slot comes.
+> more to be discussed later during implementation
+
+other -
+> need to evaluate UART, SPI, I2C for all, both master and slave, want to make sure that any theoretical protocol can be supported, including
