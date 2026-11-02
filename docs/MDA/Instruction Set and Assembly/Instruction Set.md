@@ -1,3 +1,4 @@
+# Instruction Set
 The MDA ISA is a minimalist dual-nature instruction set which merges CPU operations with deterministic execution.
 
 - Instructions are 16-bits long, fixed size. The one exception is `lli`, which is followed by a 16-bit suffix halfword.
@@ -127,8 +128,8 @@ Instructions are classified into the following types -
 |---|---|---|
 |`pull`|`rd, #shift`|Pull data from ISR into GPR, shifted by the given amount (0 to 31). Clears `ISR_RDY`.|
 |`push`|`rs1, #shift`|Push data from GPR into OSR, shifted by the given amount (0 to 31). Clears `OSR_EMPTY`.|
-|`inp`|`#count`|Start the shift engine receiving `count` bits (1 to 32) into the ISR. (TENTATIVE) The pins are taken from the engine configuration, set using `cfg`.|
-|`outp`|`#count`|Start the shift engine sending `count` bits (1 to 32) from the OSR. (TENTATIVE) The pins are taken from the engine configuration, set using `cfg`.|
+|`inp`|`#count`|Start the shift engine receiving `count` bits (1 to 32) into the ISR. The pins are taken from the engine configuration, set using `cfg`.|
+|`outp`|`#count`|Start the shift engine sending `count` bits (1 to 32) from the OSR. The pins are taken from the engine configuration, set using `cfg`.|
 |`rpin`|`rd, #pin, mode`|Read directly from a pin into a register. The mode selects the pin level, the pin's event bit (with or without clearing it), or the mask of pending pin events.|
 |`wpin`|`rs1, #pin`|Send bit 0 of a register directly to a pin. The pin must be owned by the thread, and in direct mode.|
 

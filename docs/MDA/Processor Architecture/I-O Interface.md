@@ -1,3 +1,4 @@
+# I-O Interface
 Given below is the I/O interface design for MDA. Anything that is not final is marked (TENTATIVE).
 
 - **Pins** - MDA has 24 general purpose I/O pins (`#0-#23`), shared by all threads. Protocols are implemented in firmware, there is no dedicated UART, SPI or I2C hardware.
@@ -20,22 +21,23 @@ Given below is the I/O interface design for MDA. Anything that is not final is m
 |2|2, 5, 8, 11, 14, 17, 20, 23|
 
 - Ownership rules -
-    - Ownership is changed only by the current owner, using `cfg` on the pin (the value carries the new owner). A thread cannot take a pin from another thread, `cfg` on a pin that is not owned is a fault.
-    - A transfer resets the pin to idle - output source off, roles cleared, watcher off, event bit cleared - so the new owner starts clean and no old events leak across. A transfer of a pin that is bound to a busy shift engine is a fault.
+    - Ownership is changed only by the current owner, using `cfg` on the pin (the value carries the new owner, as the next or previous thread relative to the current owner). A thread cannot take a pin from another thread, `cfg` on a pin that is not owned is a fault.
+    - A transfer resets the pin to idle - output source off, roles cleared, watcher off, event bit cleared - so the new owner starts clean and no old events leak across. A `cfg` that transfers a pin does only that, the other fields of its value are ignored. A transfer of a pin that is bound to a busy shift engine is a fault.
     - Reading the level of a pin using `rpin` is read-only and needs no ownership. Everything else (driving, event reads, watching, roles) needs it.
     - Ownership state is 2 bits per pin, 24 pins.
 - **Pin configuration** - Each pin has a static configuration, set by its owner using `cfg` (target `PIN`) with a packed value in a register. There is no arbitration between sources, as the source of every output pin is selected statically.
 
-|Field|Options| Meaning                                                                                       |
+|Field|Options| Meaning                                                                                                                                     |
 |---|---|---|
-|Pin|`#0-#23`| The pin that is being configured                                                              |
-|New owner|Thread 0, 1 or 2| Transfers ownership (see above)                                                               |
-|Output source|Off, direct, engine data, engine clock| What drives the pin. `direct` means `wpin`                                                    |
-|Input roles|Engine data-in, engine clock-in| What the pin feeds. A pin can have an input role and an output source together (e.g. I2C SDA) |
-|Open-drain|On or off| When on, driving 1 releases the pin instead of driving it high (for I2C)                      |
-|Watcher mode|`000`-`111`| Pin event detection, see [`Events.md`](Events.md)                                             |
+|Pin|`#0-#23`| The pin that is being configured                                                                                                            |
+|New owner|Keep, next or previous thread| Transfers ownership, relative to the owner (see above)                                                                                      |
+|Output source|Off, direct, engine data, engine clock| What drives the pin. `direct` means `wpin`                                                                                                  |
+|Input roles|Engine data-in, engine clock-in, gate| What the pin feeds. A pin can have an input role and an output source together (e.g. I2C SDA)                                               |
+|Open-drain|On or off| When on, driving 1 releases the pin instead of driving it high (for I2C)                                                                    |
+|Watcher mode|`000`-`111`| Pin event detection, see [`Events.md`](Events.md)                                                                                           |
+|Idle level|0 or 1| What the pin drives from the engine while no transfer is running (e.g. high for UART TX). For the clock output pin it is the clock polarity |
 
-- (TENTATIVE) Two more fields are proposed, to be decided - an **idle level** (what the pin drives from the engine while no transfer is running, e.g. high for UART TX and the SPI clock idle level), and a **gate** input role (the engine only shifts while the gate pin is asserted, e.g. chip select for an SPI slave, so the frame starts and aborts cleanly).
+- The **gate** input role makes the engine shift only while the gate pin is asserted (e.g. chip select for an SPI slave), so the frame starts and aborts cleanly. The gate is fixed active-low, so it is asserted while the pin is low.
 - **Input synchronization** - Every input pin goes through a 2 flip-flop synchronizer followed by a "previous sample" flop. These are shared by all threads, and are used by `rpin`, the shift engines and the pin watchers (see [`Events.md`](Events.md)).
 - **Direct access** - `rpin` reads from a pin directly into a register, and `wpin` writes a register directly to a pin. Each such access takes place in the thread's slot, so the timing is quantized to the 3-cycle slot rotation.
     - `wpin rs1, #pin` - Writes bit 0 of `rs1` to the pin (with open-drain on, 1 means release). The pin must be owned by the thread and have the output source `direct`, otherwise it is a fault.
@@ -52,8 +54,8 @@ Given below is the I/O interface design for MDA. Anything that is not final is m
 - The PENDING modes do not use the pin field. Three mode codes are spare. A mode that reads all 24 levels at once is a possible use for one of them (TENTATIVE).
 - **ISR and OSR** - Each thread has its own input shift register (ISR) and output shift register (OSR), 32 bits wide like the word.
     - `pull rd, #shift` moves the ISR data into a register, and `push rs1, #shift` moves register data into the OSR. The shift amount uses the idle ALU shifter to align the data, e.g. LSB-first data of `n` bits lands in the top of the ISR, and `pull` with a shift of `32 - n` aligns it.
-    - (TENTATIVE) `pull` shifts the ISR right by the amount, and `push` shifts left. `pull` clears `ISR_RDY`, and `push` clears `OSR_EMPTY`.
-- **Shift engines** - Each thread has one shift engine (TENTATIVE, see below). `inp #count` and `outp #count` start a transfer of `count` bits (1 to 32) instead of moving a single bit per instruction. The pins the engine uses are configured beforehand using `cfg`, so the instructions only carry a count (TENTATIVE).
+    - `pull` shifts the ISR right by the amount, and `push` shifts left. `pull` clears `ISR_RDY`, and `push` clears `OSR_EMPTY`.
+- **Shift engines** - Each thread has one shift engine (TENTATIVE, see below). `inp #count` and `outp #count` start a transfer of `count` bits (1 to 32) instead of moving a single bit per instruction. The pins the engine uses are configured beforehand using `cfg`, so the instructions only carry a count.
     - The engine samples (`inp`) or drives (`outp`) one bit every DIV clock cycles. It runs on the raw clock, independent of the thread's slot, so the bit timing is cycle-exact. Only the start of a transfer is aligned to the thread's slot, by a fixed delay.
     - The first sample of an input transfer happens DIV cycles after the launch. This is fixed, there is no configurable offset. For a UART receiver, launching at the middle of the start bit puts the first sample in the middle of the first data bit.
     - The instruction returns immediately, and the thread can do other work. When the transfer finishes, `ISR_RDY` (`inp`) or `OSR_EMPTY` (`outp`) is set. Completion means the end of the `n`-th bit period, not the moment of the last sample.
@@ -63,23 +65,35 @@ Given below is the I/O interface design for MDA. Anything that is not final is m
     - When an output transfer is armed, the first bit is driven on the pin at the launch (so, for example, an SPI slave has its first bit ready before the first clock edge).
     - Launching `inp` while `ISR_RDY` is set clears it and sets `OVR`. A word that finishes before the previous one was pulled overwrites it and sets `OVR`.
     - Launching a transfer while the engine is busy, or with no engine pins configured, is a fault (`ERR`).
+    - Launching a transfer with the OSR empty (`OSR_EMPTY` set) is not a fault. The engine shifts out whatever the OSR holds, so a duplex transfer used only to receive needs no dummy `push`.
     - The engine can be stopped at any time using the abort target of `cfg`, e.g. when an SPI slave sees chip select rise in the middle of a frame.
     - DIV is a 16-bit per-thread divisor, set using `cfg`. Putting the divisor in the `inp` and `outp` instructions directly was considered, but there is no room for it.
     - With the engine, the per-bit instruction budget of a protocol disappears for shifting, the budget becomes the number of instructions between word transfers.
     - (TENTATIVE) There is a gap of about 2-3 slots between consecutive words, as the thread has to `pull` or `push` and relaunch. Continuous streams are therefore sent as frames of up to 32 bits per engine run. A shadow register would remove the gap, at an area cost.
     - (TENTATIVE) There is only one engine per thread, for both directions. A full duplex UART (receiving and sending at independent timing) therefore needs two threads. A second engine per thread would remove this, at an area cost.
-- **Clock output** - A pin whose output source is `engine clock` is toggled by the engine, so a whole word can be clocked out with no software involvement (e.g. SPI). The polarity and phase come from the engine configuration. (TENTATIVE) Its area cost is to be confirmed with synthesis, it is the first feature to cut if area gets tight.
+- **Clock output** - A pin whose output source is `engine clock` is toggled by the engine, so a whole word can be clocked out with no software involvement (e.g. SPI). The polarity is the idle level of the clock pin, and the phase comes from the engine configuration. (TENTATIVE) Its area cost is to be confirmed with synthesis, it is the first feature to cut if area gets tight.
 - **Open-drain** - For I2C, a pin with open-drain on only ever pulls low or releases. A pin that is released can still be read, so the thread can see another device holding the line (clock stretching).
 - **Configuration** - `cfg #target, rs1` writes configuration to the issuing thread's own pins, engine or timer, with the value in `rs1`. It takes effect at the thread's next slot. It never touches another thread's resources.
 
-| Target      | Value in `rs1`                                                       | Effect                                                                                     |
-| ----------- | -------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
-| `PIN`       | Pin, new owner, output source, input roles, open-drain, watcher mode | Full configuration of an owned pin. Clears the pin's event bit                             |
-| `WATCH`     | Pin, watcher mode                                                    | Watcher only, on an owned pin. Clears the event bit, so it is the cheap way to re-arm      |
-| `ENG_DIV`   | 16-bit divisor                                                       | Sets the sample interval or clock-out half-period. The engine must be idle                 |
-| `ENG_CTL`   | Bit order, duplex, clock polarity, clock phase                       | Sets the engine mode. The engine must be idle                                              |
-| `ENG_ABORT` | Ignored                                                              | Stops the engine, discards partial input, sets no completion flag, and marks the OSR empty |
-| `TMR`       | 32-bit count (0 disarms)                                             | Starts or disarms the timer. Clears `TMR` (see [`Events.md`](Events.md))                   |
+|Target|Value in `rs1`| Effect                                                                                     |
+| ----------- | -------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+|`PIN`|Pin, new owner, output source, input roles, open-drain, idle level, watcher mode| Full configuration of an owned pin. Clears the pin's event bit                             |
+|`WATCH`|Pin, watcher mode| Watcher only, on an owned pin. Clears the event bit, so it is the cheap way to re-arm      |
+|`ENG_DIV`|16-bit divisor| Sets the sample interval or clock-out half-period. The engine must be idle                 |
+|`ENG_CTL`|Bit order, duplex, clock phase| Sets the engine mode. The engine must be idle                                              |
+|`ENG_ABORT`|Ignored| Stops the engine, discards partial input, sets no completion flag, and marks the OSR empty |
+|`TMR`|32-bit count (0 disarms)| Starts or disarms the timer. Clears `TMR` (see [`Events.md`](Events.md))                   |
+
+- **Packing of the `cfg` value** - Bits that are not listed are reserved and must be 0, and a reserved code is not allowed, otherwise the `cfg` is a bad `cfg` (see [`Events.md`](Events.md)). The pin and the watcher mode sit in the same bits in `PIN` and `WATCH`, and a `WATCH` value fits in a single `lbi`.
+
+|Target|Bits|
+|---|---|
+|`PIN`|`[4:0]` pin, `[7:5]` watcher mode, `[9:8]` output source (`00` off, `01` direct, `10` engine data, `11` engine clock), `[10]` data-in role, `[11]` clock-in role, `[12]` gate role, `[13]` open-drain, `[14]` idle level, `[16:15]` owner (`00` keep, `01` next thread, `10` previous thread, `11` reserved)|
+|`WATCH`|`[4:0]` pin, `[7:5]` watcher mode|
+|`ENG_DIV`|`[15:0]` divisor|
+|`ENG_CTL`|`[0]` bit order (0 is LSB first), `[1]` duplex, `[2]` clock phase|
+|`ENG_ABORT`|Ignored|
+|`TMR`|`[31:0]` count|
 
 - `cfg` changes how the hardware behaves, never what it reports, with two exceptions. Re-arming something clears its own flag (so events from before arming are never seen), and `ENG_ABORT` and `TMR` start or stop something instead of just configuring it.
 - A faulting `cfg` has no effect, and sets `ERR` with cause `10` (see [`Events.md`](Events.md)).

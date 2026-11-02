@@ -1,3 +1,4 @@
+# Core Components
 Given below are the core components of MDA. Most of this is tentative, and the area figures are rough estimates, to be checked using synthesis with the IHP sg13g2 library.
 
 - **Threads and registers** - 3 threads, each with 8 GPRs (24 total), its own PC, local flags, ISR/OSR, a timer and a delay counter. There is no hardwired zero register.

@@ -1,3 +1,4 @@
+# Threading
 Given below is the threading design and implementation for MDA.
 
 - **Interleaved barrel processor** - Switching between the IF, ID, and EX stages in a round the robin fashion. When one thread is fetching, another thread is decoding and the other one is executing.
@@ -16,7 +17,7 @@ Given below is the threading design and implementation for MDA.
     - Ringing a doorbell that is still set does not lose the doorbell, but it sets `OVR` in the sender, as the sender is the one that made the mistake. The receiver is not told.
     - Doorbells never block, so every instruction takes a fixed time. A thread that wants to wait does so explicitly, using `waitev` on the doorbell flag.
     - Data written before ringing is always visible to the receiver, since a store completes in its own slot, and a doorbell ring takes effect after the sender's instruction.
-    - (TENTATIVE) A ring becomes visible to one of the two other threads after 1 cycle, and to the other one after 2 cycles, deterministically, depending on where it sits in the schedule. Which of `MSG_N` and `MSG_P` is the faster one is to be confirmed with a timing diagram.
+    - A ring becomes visible to the next thread (as its `MSG_P`) after 1 cycle, and to the previous thread (as its `MSG_N`) after 2 cycles, deterministically, depending on where each thread sits in the schedule. (TENTATIVE) This assumes the ring takes effect and the flags are snapshotted in the same pipeline stage, to be confirmed in RTL.
     - The memory used for passing data (which region belongs to whom, and whether it is one-deep or a ring buffer) is a software convention, to be defined in the ABI. If a sender wants to know that the receiver has consumed the data, the receiver can clear a "full" word in shared memory, and the sender can check it before writing.
 
 ```
@@ -31,6 +32,6 @@ flg   ring_next    ; ring B          lw    r1, 0(r7)             ; read data
 - **Thread startup** - All three threads start together, when the firmware loader (see [`Core Components.md`](Core%20Components.md)) releases them. The loader sets the entry PC of every thread, so no thread ID instruction is needed, and the entry point is what gives a thread its identity. All three entry records are mandatory, there is no hardware mechanism to disable a thread.
     - Start state - The PC is the entry point. The flags are clear, except `OSR_EMPTY`, which is set. The ISR and OSR are empty, the shift engine is idle, the timer is disarmed, and all watchers are off. The pins are idle with their default owners. The GPRs are not initialized, so reading a register before writing it is undefined and programs must not rely on it.
     - Unused thread - A thread that is not needed is given an entry point that parks it. If it owns pins that another thread needs, it first hands them over using `cfg` (only the owner of a pin can transfer it), and then parks.
-    - Parking - A thread parks by sleeping in a `waitev` on its doorbell flags (and optionally `TMR`), going back to sleep if it wakes up for no reason. Another thread wakes it by ringing its doorbell using `flg`. A parked thread keeps its slot, so it never affects the timing of the other threads. (TENTATIVE) The idiom may be wrapped in a pseudo-instruction, to be defined in `Assembly.md`.
+    - Parking - A thread parks by sleeping in a `waitev` on its doorbell flags (and optionally `TMR`), consuming the doorbell when it wakes (so that a later ring does not set `OVR` in the sender), and going back to sleep if it wakes up for no reason. Another thread wakes it by ringing its doorbell using `flg`. A parked thread keeps its slot, so it never affects the timing of the other threads. (TENTATIVE) The idiom may be wrapped in a pseudo-instruction, to be defined in `Assembly.md`.
     - If every thread is asleep and nothing can wake any of them, the chip hangs. A parked thread can include `TMR` in its mask so that no sleep is unbounded, or one thread can always stay awake as a supervisor.
 - **Stacks** - Threads share the same data memory. Each thread's stack is its own region of it (TENTATIVE).

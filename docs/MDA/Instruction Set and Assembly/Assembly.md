@@ -1,5 +1,5 @@
+# Assembly Language
 The MDA assembly language is an assembly language based on the MDA ISA. It features both instructions and pseudo-instructions.
-
 ### Syntax
 
 The MDA ASM has syntax that is very similar to other major assembly languages. The syntax is outlined as follows -
@@ -120,11 +120,11 @@ The 35 assembly instructions are as follows -
 
 - Notes on the instructions -
     - `lbi` loads an 8-bit constant, `lli` a 24-bit constant (the assembler emits the suffix halfword by itself), and `lui` sets the upper 8 bits. A 32-bit constant is made with `$li`.
-    - `inp` and `outp` only take a count, the pins come from the engine configuration set by `cfg` (TENTATIVE).
+    - `inp` and `outp` only take a count, the pins come from the engine configuration set by `cfg`.
     - `joc` takes its flag mask from a register, and only the low 16 bits of it are used (so does `waitev`).
     - `jof` with `@inv` and the four modes of `joc` are variants of the same instructions (see `Instruction_Encoding.md`), so the mnemonics do not change.
     - `jof` and `joc` reach -32 to 31 and `jmp` reaches -128 to 127, in units of instruction memory addresses (halfwords, so an `lli` counts as 2) from the next instruction, and `jnl` (-512 to 511, wrapping around) reaches the whole instruction memory. For the plain instructions, a label that is out of range is an assembler error, it is never fixed silently. The pseudo-instructions below choose the far form by themselves.
-    - The `cfg` targets are `#PIN`, `#WATCH`, `#ENG_DIV`, `#ENG_CTL`, `#ENG_ABORT` and `#TMR`. (TENTATIVE) The packing of the value in `rs1` follows the encoding of the fields in `I-O_Interface.md`, and the assembler may provide helper constants for it.
+    - The `cfg` targets are `#PIN`, `#WATCH`, `#ENG_DIV`, `#ENG_CTL`, `#ENG_ABORT` and `#TMR`. The packing of the value in `rs1` is given in `I-O_Interface.md`. (TENTATIVE) The assembler may provide helper constants for it.
 
 ### Register Conventions (ABI)
 
@@ -169,13 +169,14 @@ The 35 assembly instructions are as follows -
 |`$spush rs`|`addi rsp, rsp, -4`, then `sw rs, 0(rsp)`|Push a register onto the stack|2 slots|Z, N, C|
 |`$spop rd`|`lw rd, 0(rsp)`, then `addi rsp, rsp, 4`|Pop a register from the stack|2 slots|Z, N, C|
 |`$halt`|`jnl` to itself (an offset of -1)|Spin forever, the thread keeps its slot|1 slot per loop|None|
-|`$park rt`|`lli rt, M_MSG_N \| M_MSG_P`, then `waitev rt, @any, @set`, then `jnl` back to the `waitev`|Park a thread until another thread rings its doorbell, going back to sleep if woken for no reason|3 slots, then asleep|None|
-|`$waitp rt, #pin, @mode`|Sequence given below|Sleep until an event on one pin. The mode is `@posedge`, `@negedge`, `@anyedge`, `@high` or `@low`|About 12 slots plus the wait|Z, N, C|
+|`$park rt`|`lli rt, M_MSG_N \| M_MSG_P`, then `waitev rt, @any, @set, @consume`, then `jnl` back to the `waitev`|Park a thread until another thread rings its doorbell, going back to sleep if woken for no reason|3 slots, then asleep|None|
+|`$waitp rt, #pin, @mode`|Sequence given below|Sleep until an event on one pin. The mode is `@posedge`, `@negedge`, `@anyedge`, `@high` or `@low`|About 10 slots plus the wait|Z, N, C|
 
 - (TENTATIVE) `$sub` is done with no scratch register -
     - If `rd` is not `rs2` - `xori rd, rs1, -1`, then `add rd, rd, rs2`, then `xori rd, rd, -1`.
     - If `rd` is `rs2` - `xori rd, rd, -1`, then `add rd, rd, rs1`, then `addi rd, rd, 1`.
     - `Z` and `N` reflect the result, but `C` is not meaningful after it, so use `cmp` or `cmpa` for comparisons.
+    - If `rd`, `rs1` and `rs2` are all the same register, the result is 0, and the assembler emits `xor rd, rd, rd` (1 slot).
 - `$li` - `lli` sets the lower 24 bits and zero extends, so in the 32-bit form it comes before `lui`, which sets the upper 8 bits. A negative constant such as `-1` is a full 32-bit value, so it takes 3 slots. A label operand always uses `lli` (24 bits), so the size never depends on where the label ends up.
 - The far forms of `$jof`, `$joc` and the branches below are the inverted condition jumping over a `jnl` - `$jof flag, @noinv, L` far is `jof flag, @inv, skip`, then `jnl L`, then `skip:`. For `jof` the `@inv` and `@noinv` swap, and for `joc` the modes swap (`@all` and `@notall`, `@any` and `@none`). If the original condition is true it falls into the `jnl` (2 slots), if not it skips it (1 slot), so the timing of a far jump depends on the outcome, unlike a near one. Timing critical code should keep its jumps in range. The assembler picks the plain form when the label is in range, growing forms until nothing changes.
 - Compare and branch - these do the compare and the jump together, as two registers are almost always needed, and a jump on existing flags is already `jof` or `joc`. They overwrite `Z` and `N`.
@@ -194,10 +195,11 @@ The 35 assembly instructions are as follows -
 
 - The compare and branch pseudo-instructions take 2 slots when the label is in range. If it is out of range they use the far form, which is 2 slots when not taken and 3 when taken. They rely on `cmp` and `cmpa` setting both `N` and `Z` to 0 when the compare is false (see `Instruction_Set.md`).
 - `$spush` and `$spop` are named so as not to be confused with the `push` and `pull` instructions, which move data to and from the shift registers. The immediates -4 and 4 fit in the 4-bit range of `addi` (-8 to 7).
+- `$park` consumes the doorbell it wakes on, so a later ring from another thread does not set `OVR` in the sender.
 - (TENTATIVE) `$waitp` is one-shot, it leaves the pin's watcher off. It loops, because `PE` is the OR of all of the pins the thread owns, so an event on another pin can wake it. The pseudo-instruction is expensive, for timing critical code (e.g. a UART receiver) use the explicit instructions instead.
 
 ```
-    lli    rt, <pin and mode>     ; arm the watcher, this clears its event bit
+    lbi    rt, <pin and mode>     ; arm the watcher, this clears its event bit
     cfg    #WATCH, rt
 wait:
     lli    rt, M_PE
@@ -205,7 +207,7 @@ wait:
     rpin   rt, #pin, @event_clr   ; was it this pin's event?
     addi   @na, rt, 0
     jof    Z, wait                ; no, go back to sleep
-    lli    rt, <pin and OFF>      ; disarm the watcher
+    lbi    rt, <pin and OFF>      ; disarm the watcher
     cfg    #WATCH, rt
 ```
 

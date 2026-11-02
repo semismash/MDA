@@ -1,3 +1,4 @@
+# Instruction Encoding
 There are 8 encoding types of instructions in the MDA ISA, plus the suffix halfword which follows `lli`. They are `RR`, `RI-A`, `RI-Z`, `DI-L`, `DI-Z`, `NX`, `RX`, `SX` and the `SUFFIX`. There are 35 instructions, which are encoded in 37 opcode and FUNCT combinations, as `jof` and `joc` each have two variants (see the section on variants).
 
 - Instructions are 16 bits long. The loader sends them as 16-bit units, so there is no byte order on the load path. In a byte-oriented file (e.g. a hex dump), the low byte comes first (little-endian).

@@ -1,3 +1,4 @@
+# Events
 ### Events
 
 Events are changes in the hardware state that can be observed in the CPU. They do not represent changes in the control flow itself, but can be handled by doing so, via software, hence preserving determinism.
@@ -8,12 +9,13 @@ Events are changes in the hardware state that can be observed in the CPU. They d
 
 ### Event Flags
 
-- Event state is held in the `FLAGS` register, so events are observed using the same conditional jumps as the ALU flags (`jof`, `joc`), and can be waited on using `waitev`. Flags are of two kinds -
+- Event state is held in the `FLAGS` register, so events are observed using the same conditional jumps as the ALU flags (`jof`, `joc`), and can be waited on using `waitev`. Flags are of three kinds -
     - **Sticky** - Holds its value until it is cleared or overwritten. Event flags are set by hardware (or by a doorbell ring from another thread), and cleared only by software (using `flg`, by consuming them in `waitev`, or by re-arming the thing that sets them). Examples - pin edge events, `TMR`, `ERR`, `OVR`, doorbells. The ALU flags (`Z`, `N`, `C`) are sticky as well, but they are set by an instruction instead of by a hardware event, and they are overwritten by the next instruction that sets them.
-    - **Live** - Mirror the current hardware state, and clear themselves. Examples - pin level conditions, `PE`, ISR/OSR status.
+    - **Live** - Mirror the current hardware state, and clear themselves. Examples - pin level conditions, `PE`.
+    - **Status** - Set by the shift engine hardware, and held until the instruction that consumes or restarts them clears them (`pull`, `push`, or launching a transfer). Examples - `ISR_RDY`, `OSR_EMPTY`.
 - All flags are local to a thread, each thread has its own view of them. There are no global flags. The doorbell state is physically shared between threads (6 bits), but each thread only sees its own two incoming bits (see [`Threading.md`](Threading.md)).
 - Every thread sees the flags as they were at the start of its own slot.
-- **One writer rule** - Every flag has exactly one source that sets it (an instruction, hardware, or another thread's doorbell ring). Software never writes a flag that mirrors hardware state. The only direct software writes are acknowledging sticky flags (`ERR`, `OVR`, `MSG_N`, `MSG_P`) and ringing another thread's doorbell, both using `flg`. This keeps every flag traceable to a single source, which makes it checkable in verification.
+- **One writer rule** - Every flag has exactly one source that sets it (an instruction, hardware, or another thread's doorbell ring). Software never writes a flag that mirrors hardware state. A status flag is set only by the shift engine, and is cleared only by the instruction that consumes or restarts it (`pull`, `push`, or launching a transfer). The only direct software writes are acknowledging sticky flags (`ERR`, `OVR`, `MSG_N`, `MSG_P`) and ringing another thread's doorbell, both using `flg`. This keeps every flag traceable to a single source, which makes it checkable in verification.
 
 ### Flag Layout
 
@@ -29,8 +31,8 @@ Events are changes in the hardware state that can be observed in the CPU. They d
 |4|`ERRC0`|Sticky|Bit 0 of the fault cause, latched with the first fault|Cleared together with `ERR`|
 |5|`ERRC1`|Sticky|Bit 1 of the fault cause, latched with the first fault|Cleared together with `ERR`|
 |6|`ERRC2`|Sticky|Bit 2 of the fault cause, latched with the first fault|Cleared together with `ERR`|
-|7|`ISR_RDY`|Live|Shift engine completes an input word|`pull`, or launching `inp`|
-|8|`OSR_EMPTY`|Live|Shift engine finishes shifting out a word, and at reset|`push`|
+|7|`ISR_RDY`|Status|Shift engine completes an input word|`pull`, or launching `inp`|
+|8|`OSR_EMPTY`|Status|Shift engine finishes shifting out a word, and at reset|`push`|
 |9|`MSG_N`|Sticky|Doorbell rung by the next thread|`flg` acknowledge, or `waitev` consume|
 |10|`MSG_P`|Sticky|Doorbell rung by the previous thread|`flg` acknowledge, or `waitev` consume|
 |11|`PE`|Live (derived)|OR of the event bits of all pins owned by this thread|Clearing the pin event bits (`rpin` with clear), re-arming the watcher, ownership transfer|
@@ -64,7 +66,7 @@ Events are changes in the hardware state that can be observed in the CPU. They d
 |`000`|OFF|-|Never (watcher disabled)|
 |`001`|LOW|Live|The pin is low|
 |`010`|HIGH|Live|The pin is high|
-|`011`|-|-|Reserved|
+|`011`|-|-|Reserved, a `cfg` with this mode is a bad `cfg`|
 |`100`|OFF|-|Never (watcher disabled)|
 |`101`|POS|Sticky|A rising edge occurs|
 |`110`|NEG|Sticky|A falling edge occurs|
@@ -90,13 +92,13 @@ Events are changes in the hardware state that can be observed in the CPU. They d
 |ALL + CLEAR|No selected flag is set|`10`|
 |ANY + CLEAR|Not all selected flags are set|`11`|
 
-- A third field, CONSUME, clears the sticky event flags in the mask (that were set at wake up) when the thread wakes. Only `MSG_N`, `MSG_P` and `TMR` can be consumed. The ALU flags, `ERR`, `OVR` and the live flags are never affected (`ERR` and `OVR` are cleared using `flg`).
+- A third field, CONSUME, clears the sticky event flags in the mask (that were set at wake up) when the thread wakes. Only `MSG_N`, `MSG_P` and `TMR` can be consumed. The ALU flags, `ERR`, `OVR` and the status and live flags are never affected (`ERR` and `OVR` are cleared using `flg`).
 - (TENTATIVE) A 4-bit field is kept reserved for an optional post-event delay of 0-15 cycles, to wake up a precise number of cycles after the event. It must be zero for now.
 - `waitev` does not look at edges, it checks the flag levels as they were at the start of the thread's slot. Edges are turned into sticky flags by the watchers beforehand.
 - Rules -
     - If the condition is already true, `waitev` takes one slot and falls through. A sticky event that arrived earlier is therefore never missed. To wait for a new event, clear the flag first.
     - Otherwise, the thread sleeps and wakes at the first slot whose snapshot meets the condition. The next instruction runs one slot later. The wake up time is a pure function of the event time.
-    - Consume only applies to `MSG_N`, `MSG_P` and `TMR`, and is ignored when waiting for CLEAR. The ALU flags, `ERR`, `OVR` and the live flags (`ISR_RDY`, `OSR_EMPTY`, `PE`) are never affected. A new event arriving in the same cycle as a consume counts as a new event, the flag stays set.
+    - Consume only applies to `MSG_N`, `MSG_P` and `TMR`, and is ignored when waiting for CLEAR. The ALU flags, `ERR`, `OVR` and the status and live flags (`ISR_RDY`, `OSR_EMPTY`, `PE`) are never affected. A new event arriving in the same cycle as a consume counts as a new event, the flag stays set.
     - Consuming is useful for waiting on a single flag. When waiting on several flags together, consuming clears the one that woke the thread, so it can no longer be told apart. In that case, wait without consume and dispatch using `jof` on the flags.
     - `PE` is not consumed by `waitev`, since it would hide events from other pins. Pin events are cleared individually using `rpin` with clear.
     - An empty mask (low 16 bits all zero) is a fault (cause `101`), and the thread falls through. Waiting forever would be a deadlock with no interrupts to recover from, if that is wanted a thread can spin on a self-jump instead.
@@ -149,7 +151,7 @@ cfg    #TMR, r0             ; disarm
 |---|---|---|---|
 |Misaligned access|`lw` or `sw` on an address that is not word aligned|Store suppressed, load returns 0|`000`|
 |Out-of-bounds access|Any data memory access outside of the memory|Store suppressed, load returns 0|`001`|
-|Bad `cfg`|Reserved target, pin number above 23, pin not owned by the thread, role the pin cannot do, divisor of 0, engine write while the engine is busy (except abort)|No effect|`010`|
+|Bad `cfg`|Reserved target, pin number above 23, pin not owned by the thread, role the pin cannot do, reserved bits or a reserved owner code set in the value, watcher mode `011`, divisor of 0, engine write while the engine is busy (except abort)|No effect|`010`|
 |Bad pin access|`wpin` on a pin that is not owned or not in direct mode, `rpin` event modes on a pin that is not owned, `rpin` on an output-only pin|No effect, reads return 0|`011`|
 |Bad engine launch|`inp` or `outp` with no engine pins configured, or while the engine is busy|No effect|`100`|
 |Bad `waitev`|Empty mask|Falls through|`101`|
@@ -166,7 +168,7 @@ cfg    #TMR, r0             ; disarm
 - Detecting the start bit of a UART frame on pin 3 (pin 3 belongs to thread 0 by default, syntax is TENTATIVE) -
 
 ```
-lli r1, WATCH_P3_NEG        ; watcher config - pin 3, mode NEG (value packing TBD)
+lli r1, WATCH_P3_NEG        ; watcher config - pin 3, mode NEG
 cfg #WATCH, r1              ; arm the watcher (also clears its event bit)
 lli r2, PE_MASK             ; mask for the PE flag
 waitev r2, @any, @set       ; sleep until a pin event

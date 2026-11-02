@@ -1,5 +1,5 @@
+# MDA Introduction
 The Minimalist Deterministic Architecture (MDA) is a CPU architecture aimed to prioritize deterministic execution, modularity in design, compatibility with other devices, while maintaining a small area footprint and being highly efficient. It is being constructed for the [Jane Street Protocol Emulator Challenge 2026](https://blog.janestreet.com/protocol-emulator-asic-competition/).
-
 ## Core Specification and Features
 
 ### Core Architecture
