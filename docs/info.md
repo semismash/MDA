@@ -1,20 +1,15 @@
-<!---
-
-This file is used to generate your project datasheet. Please fill in the information below and delete any unused
-sections.
-
-You can also include images in this folder and reference them in the markdown. Each image must be less than
-512 kb in size, and the combined size of all images must be less than 1 MB.
--->
-
 ## How it works
 
-It is a CPU that functions as a protocol emulator. And it does funny protocol emulator magic :3
+A small FSM writes 16 words to an IHP single-port SRAM macro (1024x16), rewrites the low
+bytes using the per-bit write mask, reads every word back and compares it with the expected
+value. It reports done, pass and fail on uo[0], uo[1] and uo[2], and shows the low nibble of
+the last word read on uo[7:4]. This design only exists to prove the SRAM macro flow.
 
 ## How to test
 
-Download and Pray it works
+Apply reset and a clock. uo[0] goes high when the test has finished, then uo[1] means pass
+and uo[2] means fail.
 
 ## External hardware
 
-Hopes and Dreams
+None.

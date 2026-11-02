@@ -8,17 +8,18 @@ project:
   clock_hz:     50000000       # Clock frequency in Hz (or 0 if not applicable)
 
   # How many tiles your design occupies? A single tile is about 167x108 uM.
-  tiles: "1x1"          # Valid values: 1x1, 1x2, 2x2, 3x2, 4x2, 6x2 or 8x2
-
+  tiles: "6x4"          # Valid values: 1x1, 1x2, 2x2, 3x2, 4x2, 6x2 or 8x2
+ 
   # Your top module name must start with "tt_um_". Make it unique by including your github username:
-  top_module:  "tt_um_example"
-
+  top_module:  "tt_um_mda_sram_dryrun"
+ 
   # List your project's source files here.
   # Source files must be in ./src and you must list each source file separately, one per line.
   # Don't forget to also update `PROJECT_SOURCES` in test/Makefile.
   source_files:
     - "project.v"
-
+    - "RM_IHPSG13_1P_1024x16_c2_bm_bist.v"
+ 
 # The pinout of your project. Leave unused pins blank. DO NOT delete or add any pins.
 # This section is for the datasheet/website. Use descriptive names (e.g., RX, TX, MOSI, SCL, SEG_A, etc.).
 pinout:
@@ -31,17 +32,17 @@ pinout:
   ui[5]: "unused"
   ui[6]: "unused"
   ui[7]: "unused"
-
+ 
   # Outputs
-  uo[0]: "unused"
-  uo[1]: "unused"
-  uo[2]: "unused"
+  uo[0]: "done"
+  uo[1]: "pass"
+  uo[2]: "fail"
   uo[3]: "unused"
-  uo[4]: "unused"
-  uo[5]: "unused"
-  uo[6]: "unused"
-  uo[7]: "unused"
-
+  uo[4]: "dout0"
+  uo[5]: "dout1"
+  uo[6]: "dout2"
+  uo[7]: "dout3"
+ 
   # Bidirectional pins
   uio[0]: "unused"
   uio[1]: "unused"
@@ -51,6 +52,6 @@ pinout:
   uio[5]: "unused"
   uio[6]: "unused"
   uio[7]: "unused"
-
+ 
 # Do not change!
 yaml_version: 6
