@@ -54,13 +54,13 @@
         "pdk_dir::libs.ref/sg13cmos5l_sram/lef/RM_IHPSG13_1P_1024x16_c2_bm_bist.lef"
       ],
       "lib": {
-        "nom_*": [
+        "nom_typ_*": [
           "pdk_dir::libs.ref/sg13cmos5l_sram/lib/RM_IHPSG13_1P_1024x16_c2_bm_bist_typ_1p20V_25C.lib"
         ],
-        "min_*": [
+        "nom_fast_*": [
           "pdk_dir::libs.ref/sg13cmos5l_sram/lib/RM_IHPSG13_1P_1024x16_c2_bm_bist_fast_1p32V_m55C.lib"
         ],
-        "max_*": [
+        "nom_slow_*": [
           "pdk_dir::libs.ref/sg13cmos5l_sram/lib/RM_IHPSG13_1P_1024x16_c2_bm_bist_slow_1p08V_125C.lib"
         ]
       },
