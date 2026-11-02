@@ -9,12 +9,12 @@ You can also include images in this folder and reference them in the markdown. E
 
 ## How it works
 
-Explain how your project works
+It is a CPU that functions as a protocol emulator. And it does funny protocol emulator magic :3
 
 ## How to test
 
-Explain how to use your project
+Download and Pray it works
 
 ## External hardware
 
-List external hardware used in your project (e.g. PMOD, LED display, etc), if any
+Hopes and Dreams
