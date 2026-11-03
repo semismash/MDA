@@ -1,9 +1,0 @@
-Copy these files from the IHP-Open-PDK repository, folder ihp-sg13g2/libs.ref/sg13g2_sram/
-(same base name, they live in the gds, lef, cdl and lib subfolders):
-
-  RM_IHPSG13_1P_1024x16_c2_bm_bist.gds
-  RM_IHPSG13_1P_1024x16_c2_bm_bist.lef
-  RM_IHPSG13_1P_1024x16_c2_bm_bist.cdl
-  RM_IHPSG13_1P_1024x16_c2_bm_bist_typ_1p20V_25C.lib
-  RM_IHPSG13_1P_1024x16_c2_bm_bist_fast_1p32V_m55C.lib
-  RM_IHPSG13_1P_1024x16_c2_bm_bist_slow_1p08V_125C.lib
