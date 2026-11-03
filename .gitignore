@@ -16,3 +16,4 @@ test/gate_level_netlist.v
 .obsidian/
 local/
 __pycache__/
+tools/isa/out/

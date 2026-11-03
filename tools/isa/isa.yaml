@@ -1,0 +1,480 @@
+# MDA ISA: single source of truth for the encoding.
+#
+# Feeds: the generated RTL package (mda_isa_pkg.sv), the assembler tables, the reference-model decoder, the doc tables
+# and the golden vectors. Written from `Instruction Encoding.md` and `Instruction Set.md`.
+# Run `python3 isa_gen.py --check` after every edit: it validates this file before anything is generated from it.
+#
+# NOTE: YAML 1.1 reads bare y/n/yes/no/on/off as booleans, so those words are never used as bare names here (flag N is quoted, the
+# jump field is called `offset`).
+# Bit ranges are written "hi:lo" (or "n" for one bit) in INSTRUCTION-WORD bit numbering (bit 15 = MSB).
+# A field with several ranges is the CONCATENATION of those ranges, MSB first (e.g. ["14:13", "9:6"] is a 6-bit value whose
+# top 2 bits are word bits 14:13 and whose low 4 bits are word bits 9:6).
+# operand value = raw (sign-extended if signed) + bias. `addr_scale` is how the hardware turns the operand into an address
+# (lw/sw: address = rs1 + 4 * offset); it is not part of the operand value.   `reserved` ranges must be 0, otherwise the word is illegal.
+# `illegal_values` marks field values that make the word illegal (not a runtime fault).
+
+isa:
+  name: MDA
+  word_bits: 16
+  mnemonics: 35
+  encodings: 37          # jof and joc each use two funct codes
+  byte_order: little     # in a byte-oriented file the low byte comes first
+
+types:
+  RR:   {opcode: 0, funct: "5:3", rd: "15:13", rs1: "12:10", rs2: "9:7", wb: "6", unused_funct: []}
+  NX:   {opcode: 1, funct: "5:3", unused_funct: [5]}
+  RI-A: {opcode: 2, funct: "4:3", rd: "15:13", rs1: "12:10", wb: "5", unused_funct: []}
+  RI-Z: {opcode: 3, funct: "4:3", rd: "15:13", rs1: "12:10", unused_funct: [3]}
+  SX:   {opcode: 4, funct: "4:3", rs1: "12:10", rs2: "9:7", unused_funct: [2, 3]}
+  RX:   {opcode: 5, funct: "5:3", rs1: "12:10", unused_funct: [5]}
+  DI-L: {opcode: 6, funct: "4:3", rd: "15:13", unused_funct: [2]}
+  DI-Z: {opcode: 7, funct: "4:3", rd: "15:13", unused_funct: [2]}
+
+# Which flag a conditional jump or waitev can name (Events.md). Used for the generated constants.
+flags:
+  Z: 0
+  "N": 1
+  C: 2
+  ERR: 3
+  ERRC0: 4
+  ERRC1: 5
+  ERRC2: 6
+  ISR_RDY: 7
+  OSR_EMPTY: 8
+  MSG_N: 9
+  MSG_P: 10
+  PE: 11
+  OVR: 12
+  TMR: 13
+
+fault_causes:
+  MISALIGNED: 0
+  OUT_OF_BOUNDS: 1
+  BAD_CFG: 2
+  BAD_PIN_ACCESS: 3
+  BAD_ENGINE_LAUNCH: 4
+  BAD_WAITEV: 5
+  ILLEGAL: 6
+
+cfg_targets: {PIN: 0, WATCH: 1, ENG_DIV: 2, ENG_CTL: 3, ENG_ABORT: 4, TMR: 5}   # 6 and 7 are reserved targets (a bad cfg, not an illegal word)
+rpin_modes: {LEVEL: 0, EVENT: 1, EVENT_CLR: 2, PEND: 3, PEND_CLR: 4}              # 5..7 are illegal words
+
+instructions:
+  # ------------------------------------------------------------------ RR (opcode 000), result written only if WB = 1
+  - {name: add,  mnemonic: add,  type: RR, funct: 0, group: register_ops, stage: A, src: [rs1, rs2], dst: rd, dst_when: wb, alu: add,  b_src: rs2, flags: [Z, "N", C], c_rule: carry}
+  - {name: xor,  mnemonic: xor,  type: RR, funct: 1, group: register_ops, stage: A, src: [rs1, rs2], dst: rd, dst_when: wb, alu: xor,  b_src: rs2, flags: [Z, "N"]}
+  - {name: shl,  mnemonic: shl,  type: RR, funct: 2, group: register_ops, stage: A, src: [rs1, rs2], dst: rd, dst_when: wb, alu: shl,  b_src: rs2, flags: [Z, "N", C], c_rule: shift_out, note: "rs2 is the shift amount (low 5 bits). A shift by 0 leaves C unchanged"}
+  - {name: shr,  mnemonic: shr,  type: RR, funct: 3, group: register_ops, stage: A, src: [rs1, rs2], dst: rd, dst_when: wb, alu: shr,  b_src: rs2, flags: [Z, "N", C], c_rule: shift_out, note: "logical shift right. A shift by 0 leaves C unchanged"}
+  - {name: cmp,  mnemonic: cmp,  type: RR, funct: 4, group: register_ops, stage: A, src: [rs1, rs2], dst: rd, dst_when: wb, alu: cmp,  b_src: rs2, flags: [Z, "N"], flag_rule: cmp, note: "unsigned. rd = 1 if rs1 < rs2. N = less, Z = equal, otherwise both 0"}
+  - {name: cmpa, mnemonic: cmpa, type: RR, funct: 5, group: register_ops, stage: A, src: [rs1, rs2], dst: rd, dst_when: wb, alu: cmpa, b_src: rs2, flags: [Z, "N"], flag_rule: cmp, note: "signed compare, same flag rules as cmp"}
+  - {name: and,  mnemonic: and,  type: RR, funct: 6, group: register_ops, stage: A, src: [rs1, rs2], dst: rd, dst_when: wb, alu: and,  b_src: rs2, flags: [Z, "N"]}
+  - {name: or,   mnemonic: or,   type: RR, funct: 7, group: register_ops, stage: A, src: [rs1, rs2], dst: rd, dst_when: wb, alu: or,   b_src: rs2, flags: [Z, "N"]}
+
+  # ------------------------------------------------------------------ RI-A (opcode 010), result written only if WB = 1
+  - name: addi
+    mnemonic: addi
+    type: RI-A
+    funct: 0
+    group: immediate_ops
+    stage: A
+    src: [rs1]
+    dst: rd
+    dst_when: wb
+    alu: add
+    b_src: imm
+    flags: [Z, "N", C]
+    c_rule: carry
+    fields: {imm: {bits: ["9:6"], signed: true}}
+  - name: xori
+    mnemonic: xori
+    type: RI-A
+    funct: 1
+    group: immediate_ops
+    stage: A
+    src: [rs1]
+    dst: rd
+    dst_when: wb
+    alu: xor
+    b_src: imm
+    flags: [Z, "N"]
+    fields: {imm: {bits: ["9:6"], signed: true}}
+    note: "imm = -1 is a NOT"
+  - name: shli
+    mnemonic: shli
+    type: RI-A
+    funct: 2
+    group: immediate_ops
+    stage: A
+    src: [rs1]
+    dst: rd
+    dst_when: wb
+    alu: shl
+    b_src: imm
+    flags: [Z, "N", C]
+    c_rule: shift_out
+    fields: {imm: {bits: ["9:6"]}}
+  - name: shri
+    mnemonic: shri
+    type: RI-A
+    funct: 3
+    group: immediate_ops
+    stage: A
+    src: [rs1]
+    dst: rd
+    dst_when: wb
+    alu: shr
+    b_src: imm
+    flags: [Z, "N", C]
+    c_rule: shift_out
+    fields: {imm: {bits: ["9:6"]}}
+
+  # ------------------------------------------------------------------ RI-Z (opcode 011), rd always written, no flags
+  - name: lb
+    mnemonic: lb
+    type: RI-Z
+    funct: 0
+    group: memory
+    stage: A
+    src: [rs1]
+    dst: rd
+    dst_when: always
+    mem: {op: load, size: byte}
+    fields: {offset: {bits: ["9:5"]}}
+    note: "address = rs1 + off. Unsigned load"
+  - name: lw
+    mnemonic: lw
+    type: RI-Z
+    funct: 1
+    group: memory
+    stage: A
+    src: [rs1]
+    dst: rd
+    dst_when: always
+    mem: {op: load, size: word}
+    fields: {offset: {bits: ["9:5"], addr_scale: 4}}
+    note: "address = rs1 + 4 * off. Aligned"
+  - name: jrg
+    mnemonic: jrg
+    type: RI-Z
+    funct: 2
+    group: jumps
+    stage: A
+    src: [rs1]
+    dst: rd
+    dst_when: always
+    branch: {kind: jrg, base: rs1}
+    link: true
+    fields: {imm: {bits: ["9:5"], signed: true}}
+    note: "target = rs1 + imm (low bits that fit the PC), rd = address of the next instruction"
+
+  # ------------------------------------------------------------------ DI-L (opcode 110), rd always written, no flags
+  - name: lui
+    mnemonic: lui
+    type: DI-L
+    funct: 0
+    group: immediate_loading
+    stage: A
+    src: [rd]
+    dst: rd
+    dst_when: always
+    alu: lui
+    b_src: imm
+    fields: {imm: {bits: ["12:5"]}}
+    note: "rd[31:24] = imm, the rest of rd is kept (rd is also a source)"
+  - name: lbi
+    mnemonic: lbi
+    type: DI-L
+    funct: 1
+    group: immediate_loading
+    stage: A
+    src: []
+    dst: rd
+    dst_when: always
+    alu: passb
+    b_src: imm
+    fields: {imm: {bits: ["12:5"]}}
+    note: "rd = imm, zero extended"
+  - name: lli
+    mnemonic: lli
+    type: DI-L
+    funct: 3
+    group: immediate_loading
+    stage: A
+    src: []
+    dst: rd
+    dst_when: always
+    alu: passb
+    b_src: imm
+    uses_suffix: true
+    fields: {imm: {bits: ["12:5"]}}
+    note: "imm is bits [23:16] of the 24-bit constant. The suffix halfword that follows is bits [15:0]. Takes 2 addresses and 2 slots"
+
+  # ------------------------------------------------------------------ DI-Z (opcode 111), rd always written
+  - name: jmp
+    mnemonic: jmp
+    type: DI-Z
+    funct: 0
+    group: jumps
+    stage: A
+    src: []
+    dst: rd
+    dst_when: always
+    branch: {kind: jmp, base: pc_next}
+    link: true
+    fields: {offset: {bits: ["12:5"], signed: true}}
+    note: "target = PC + 1 + off, rd = PC + 1"
+  - name: pull
+    mnemonic: pull
+    type: DI-Z
+    funct: 1
+    group: spatial
+    stage: B
+    src: []
+    dst: rd
+    dst_when: always
+    fields: {shift: {bits: ["9:5"]}}
+    reserved: ["12:10"]
+  - name: rpin
+    mnemonic: rpin
+    type: DI-Z
+    funct: 3
+    group: spatial
+    stage: B
+    src: []
+    dst: rd
+    dst_when: always
+    fields: {pin: {bits: ["12:8"]}, mode: {bits: ["7:5"]}}
+    illegal_values: {mode: [5, 6, 7]}
+    note: "pin number above 23 is a runtime fault (bad pin access), not an illegal word. For the two pending modes the pin field is ignored"
+
+  # ------------------------------------------------------------------ NX (opcode 001), no registers
+  - name: inp
+    mnemonic: inp
+    type: NX
+    funct: 0
+    group: spatial
+    stage: B
+    fields: {count: {bits: ["10:6"], bias: 1}}
+    reserved: ["15:11"]
+  - name: outp
+    mnemonic: outp
+    type: NX
+    funct: 1
+    group: spatial
+    stage: B
+    fields: {count: {bits: ["10:6"], bias: 1}}
+    reserved: ["15:11"]
+  - name: jnl
+    mnemonic: jnl
+    type: NX
+    funct: 2
+    group: jumps
+    stage: A
+    branch: {kind: jnl, base: pc_next}
+    fields: {offset: {bits: ["15:6"], signed: true}}
+    note: "target = PC + 1 + off, wrapping around the instruction memory. Offset 0 is the nop"
+  - name: jof
+    mnemonic: jof
+    type: NX
+    funct: 3
+    group: jumps
+    stage: A
+    branch: {kind: jof, base: pc_next, invert: false}
+    fields: {flag: {bits: ["15:12"]}, offset: {bits: ["11:6"], signed: true}}
+    note: "jumps if the flag is set"
+  - name: dl
+    mnemonic: dl
+    type: NX
+    funct: 4
+    group: temporal_event
+    stage: B
+    fields: {imm: {bits: ["15:6"]}}
+  - name: flg
+    mnemonic: flg
+    type: NX
+    funct: 6
+    group: config_signal
+    stage: B
+    fields:
+      ack_err: {bits: ["6"]}
+      ack_ovr: {bits: ["7"]}
+      ack_msgn: {bits: ["8"]}
+      ack_msgp: {bits: ["9"]}
+      ring_next: {bits: ["10"]}
+      ring_prev: {bits: ["11"]}
+    reserved: ["15:12"]
+    note: "all-zero flags is legal and does nothing"
+  - name: jof_inv
+    mnemonic: jof
+    type: NX
+    funct: 7
+    group: jumps
+    stage: A
+    branch: {kind: jof, base: pc_next, invert: true}
+    fields: {flag: {bits: ["15:12"]}, offset: {bits: ["11:6"], signed: true}}
+    note: "the inverted variant: jumps if the flag is clear (assembly: @inv)"
+
+  # ------------------------------------------------------------------ RX (opcode 101), rs1 + immediate, no rd
+  - name: joc_any
+    mnemonic: joc
+    type: RX
+    funct: 0
+    group: jumps
+    stage: A
+    src: [rs1]
+    branch: {kind: joc, base: pc_next, mode: any}
+    fields: {inv: {bits: ["15"]}, offset: {bits: ["14:13", "9:6"], signed: true}}
+    note: "any (inv = 0) or none (inv = 1) of the flags in the mask rs1[15:0] are set"
+  - name: push
+    mnemonic: push
+    type: RX
+    funct: 1
+    group: spatial
+    stage: B
+    src: [rs1]
+    fields: {shift: {bits: ["13", "9:6"]}}
+    reserved: ["15:14"]
+  - name: joc_all
+    mnemonic: joc
+    type: RX
+    funct: 2
+    group: jumps
+    stage: A
+    src: [rs1]
+    branch: {kind: joc, base: pc_next, mode: all}
+    fields: {inv: {bits: ["15"]}, offset: {bits: ["14:13", "9:6"], signed: true}}
+    note: "all (inv = 0) or not-all (inv = 1) of the flags in the mask rs1[15:0] are set"
+  - name: wpin
+    mnemonic: wpin
+    type: RX
+    funct: 3
+    group: spatial
+    stage: B
+    src: [rs1]
+    fields: {pin: {bits: ["13", "9:6"]}}
+    reserved: ["15:14"]
+  - name: dlrg
+    mnemonic: dlrg
+    type: RX
+    funct: 4
+    group: temporal_event
+    stage: B
+    src: [rs1]
+    fields: {imm: {bits: ["15:13", "9:6"]}}
+  - name: waitev
+    mnemonic: waitev
+    type: RX
+    funct: 6
+    group: temporal_event
+    stage: B
+    src: [rs1]
+    fields: {all: {bits: ["6"]}, clear: {bits: ["7"]}, consume: {bits: ["8"]}}
+    reserved: ["9", "15:13"]
+    note: "reserved bits are the post-event delay and must be 0 for now"
+  - name: cfg
+    mnemonic: cfg
+    type: RX
+    funct: 7
+    group: config_signal
+    stage: B
+    src: [rs1]
+    fields: {target: {bits: ["8:6"]}}
+    reserved: ["9", "15:13"]
+    note: "targets 6 and 7 are a bad cfg at run time, not illegal words"
+
+  # ------------------------------------------------------------------ SX (opcode 100), no rd, no flags
+  - name: sb
+    mnemonic: sb
+    type: SX
+    funct: 0
+    group: memory
+    stage: A
+    src: [rs1, rs2]
+    mem: {op: store, size: byte}
+    fields: {offset: {bits: ["15:13", "6:5"]}}
+    note: "address = rs1 + off, data = rs2[7:0]"
+  - name: sw
+    mnemonic: sw
+    type: SX
+    funct: 1
+    group: memory
+    stage: A
+    src: [rs1, rs2]
+    mem: {op: store, size: word}
+    fields: {offset: {bits: ["15:13", "6:5"], addr_scale: 4}}
+    note: "address = rs1 + 4 * off, data = rs2"
+
+# The 16-bit word that follows lli. It has no fields and is only ever data. A jump that lands on it decodes it as an ordinary instruction.
+suffix:
+  after: lli
+  bits: "15:0"
+  maps_to: "constant[15:0]"
+
+# Worked examples from `Instruction Encoding.md` (27 of them). They were derived by hand from the layouts, independently of this file,
+# so they are the check that this file says what the doc says. Operands use this file's field names.
+examples:
+  - {asm: "add r0, r5, r6",                       name: add,     ops: {rd: 0, rs1: 5, rs2: 6, wb: 1},       word: 0x1740}
+  - {asm: "xori @na, r7, -1",                     name: xori,    ops: {rd: 0, rs1: 7, imm: -1, wb: 0},      word: 0x1FCA}
+  - {asm: "addi r1, r2, -4",                      name: addi,    ops: {rd: 1, rs1: 2, imm: -4, wb: 1},      word: 0x2B22}
+  - {asm: "lw r3, 3(r2)",                         name: lw,      ops: {rd: 3, rs1: 2, offset: 3},              word: 0x686B}
+  - {asm: "jrg r1, r1, 0",                        name: jrg,     ops: {rd: 1, rs1: 1, imm: 0},              word: 0x2413}
+  - {asm: "lbi r1, 200",                          name: lbi,     ops: {rd: 1, imm: 200},                    word: 0x390E}
+  - {asm: "lli r1, 0x123456 (first halfword)",    name: lli,     ops: {rd: 1, imm: 0x12},                   word: 0x225E}
+  - {asm: "lui r1, 0xAB",                         name: lui,     ops: {rd: 1, imm: 0xAB},                   word: 0x3566}
+  - {asm: "jmp r4, -2",                           name: jmp,     ops: {rd: 4, offset: -2},                     word: 0x9FC7}
+  - {asm: "pull r2, 24",                          name: pull,    ops: {rd: 2, shift: 24},                   word: 0x430F}
+  - {asm: "rpin r3, @pend_clr",                   name: rpin,    ops: {rd: 3, pin: 0, mode: 4},             word: 0x609F}
+  - {asm: "rpin r3, #17, @level",                 name: rpin,    ops: {rd: 3, pin: 17, mode: 0},            word: 0x711F}
+  - {asm: "inp 8",                                name: inp,     ops: {count: 8},                           word: 0x01C1}
+  - {asm: "jnl 0 ($nop)",                         name: jnl,     ops: {offset: 0},                             word: 0x0011}
+  - {asm: "jof ERR, label (+5)",                  name: jof,     ops: {flag: 3, offset: 5},                    word: 0x3159}
+  - {asm: "jof ERR, @inv, label (+5)",            name: jof_inv, ops: {flag: 3, offset: 5},                    word: 0x3179}
+  - {asm: "dl 12",                                name: dl,      ops: {imm: 12},                           word: 0x0321}
+  - {asm: "flg @ack_err, @ack_ovr",               name: flg,     ops: {ack_err: 1, ack_ovr: 1},            word: 0x00F1}
+  - {asm: "joc r2, @all, label (-3)",             name: joc_all, ops: {rs1: 2, inv: 0, offset: -3},            word: 0x6B55}
+  - {asm: "joc r2, @none, label (-3)",            name: joc_any, ops: {rs1: 2, inv: 1, offset: -3},            word: 0xEB45}
+  - {asm: "push r5, 24",                          name: push,    ops: {rs1: 5, shift: 24},                  word: 0x360D}
+  - {asm: "wpin r1, #3",                          name: wpin,    ops: {rs1: 1, pin: 3},                     word: 0x04DD}
+  - {asm: "dlrg r2, 5",                           name: dlrg,    ops: {rs1: 2, imm: 5},                     word: 0x0965}
+  - {asm: "waitev r2, @any, @set, @consume",      name: waitev,  ops: {rs1: 2, all: 0, clear: 0, consume: 1}, word: 0x0935}
+  - {asm: "cfg #TMR, r1",                         name: cfg,     ops: {rs1: 1, target: 5},                  word: 0x057D}
+  - {asm: "sb r1, 5(r7)",                         name: sb,      ops: {rs2: 1, rs1: 7, offset: 5},             word: 0x3CA4}
+  - {asm: "sw r1, 5(r7)",                         name: sw,      ops: {rs2: 1, rs1: 7, offset: 5},             word: 0x3CAC}
+
+# Independent facts taken from the statements in `Instruction Encoding.md` (not from the tables above). Each word is checked for
+# legality (and, for legal words, the instruction it decodes to). They pin down the reserved fields, the unused funct codes and the
+# "valid encoding but a run-time fault" cases, which the worked examples do not cover.
+special_words:
+  - {word: 0x0000, legal: true,  name: add,  why: "all-zero word is add @na, r0, r0"}
+  - {word: 0xFFFF, legal: false, why: "all-one word is an illegal rpin (mode 111)"}
+  # rpin modes 101..111 are reserved, 000..100 are valid
+  - {word: 0x009F, legal: true,  name: rpin, why: "rpin mode 100 (pending and clear)"}
+  - {word: 0x00BF, legal: false, why: "rpin mode 101 is reserved"}
+  - {word: 0x00DF, legal: false, why: "rpin mode 110 is reserved"}
+  - {word: 0x1F1F, legal: true,  name: rpin, why: "pin number 31 is a run-time fault (bad pin access), not an illegal word"}
+  # unused funct codes, one word per type
+  - {word: 0x001B, legal: false, why: "RI-Z funct 11 is unused"}
+  - {word: 0x0016, legal: false, why: "DI-L funct 10 is unused"}
+  - {word: 0x0017, legal: false, why: "DI-Z funct 10 is unused"}
+  - {word: 0x0029, legal: false, why: "NX funct 101 is unused"}
+  - {word: 0x002D, legal: false, why: "RX funct 101 is unused"}
+  - {word: 0x0014, legal: false, why: "SX funct 10 is unused"}
+  - {word: 0x001C, legal: false, why: "SX funct 11 is unused"}
+  # reserved fields that must be 0
+  - {word: 0x000F, legal: true,  name: pull, why: "pull with all reserved bits 0"}
+  - {word: 0x040F, legal: false, why: "pull with IMM[7:5] (bit 10) set"}
+  - {word: 0x0031, legal: true,  name: flg,  why: "flg with no bits set is legal and does nothing"}
+  - {word: 0x1031, legal: false, why: "flg with IMM[9:6] (bit 12) set"}
+  - {word: 0x0801, legal: false, why: "inp with IMM[9:5] (bit 11) set"}
+  - {word: 0x0809, legal: false, why: "outp with IMM[9:5] (bit 11) set"}
+  - {word: 0x0135, legal: true,  name: waitev, why: "waitev with the consume bit (8) set and the reserved bits clear is legal"}
+  - {word: 0x2035, legal: false, why: "waitev with reserved bit 13 set"}
+  - {word: 0x0335, legal: false, why: "waitev with reserved bit 9 set (and consume)"}
+  - {word: 0x023D, legal: false, why: "cfg with reserved bit 9 set"}
+  - {word: 0x01BD, legal: true,  name: cfg,  why: "cfg target 110 is a run-time bad cfg, not an illegal word"}
+  - {word: 0x4035, legal: false, why: "waitev with reserved bit 14 set"}
+  - {word: 0x0025, legal: true,  name: dlrg, why: "funct 100 under opcode 101 is dlrg (a legal word)"}
+  - {word: 0x000D, legal: true,  name: push, why: "push with reserved bits clear"}
+  - {word: 0x001D, legal: true,  name: wpin, why: "wpin with reserved bits clear"}
+  - {word: 0x400D, legal: false, why: "push with reserved bit 14 set"}
+  - {word: 0x401D, legal: false, why: "wpin with reserved bit 14 set"}
