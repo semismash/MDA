@@ -1,13 +1,12 @@
 import mda_pkg::*;
 
 // synchronous writes, asynchronous reads
-module reg_file #(
+module mda_regfile #(
     parameter DATA_WIDTH = mda_pkg::DATA_WIDTH,
     parameter ADDR_WIDTH = mda_pkg::REG_ADDR_WIDTH
 ) (
     // clk and reset
     input  logic    clk,
-    input  logic    rst_n,
     // INPUTS:
     // read logic
     input  RegAddr  r_addr1,    // rs1 read address
@@ -28,14 +27,8 @@ module reg_file #(
     assign r_data2 = register_file[r_addr2];
 
     // write logic
-    always_ff @(posedge clk or negedge rst_n) begin
-        if (!rst_n) begin
-            for (int i = 0 ; i < 2**ADDR_WIDTH ; i = i+1) begin
-                register_file[i] <= '0;
-            end
-        end else begin
-            if (w_enable) register_file[w_addr] <= w_data;
-        end
+    always_ff @(posedge clk) begin
+        if (w_enable) register_file[w_addr] <= w_data;
     end
 
 endmodule

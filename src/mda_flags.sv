@@ -1,6 +1,7 @@
 import mda_pkg::*;
+import mda_isa_pkg::*;
 
-module flags (
+module mda_flags (
     // clk and reset
     input  logic clk,
     input  logic rst_n,
@@ -38,6 +39,7 @@ module flags (
     always_ff @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
             flag_reg <= '0;
+            flag_reg[FLAG_OSR_EMPTY] <= 1'b1;
         end else begin
             // 1) ALU
             if (u_alu) begin
@@ -70,7 +72,7 @@ module flags (
             if (u_tmr) flag_reg[FLAG_TMR] <= f_tmr;
             // 6) SPARE
             flag_reg[FLAG_SPARE_0] <= 1'b0; // hold down to zero for spare flags, as they are unused
-            flag_REG[FLAG_SPARE_1] <= 1'b0;
+            flag_reg[FLAG_SPARE_1] <= 1'b0;
         end
     end
     

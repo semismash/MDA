@@ -1,6 +1,6 @@
 import mda_pkg::*;
 
-module alu #(
+module mda_alu #(
     parameter DATA_WIDTH = mda_pkg::DATA_WIDTH,
     parameter ADDR_WIDTH = mda_pkg::REG_ADDR_WIDTH
 ) (
@@ -13,8 +13,7 @@ module alu #(
     input  logic use_imm,       // use imm instead of rs2
     input  Word  imm,           // immediate from decoder (imm gen)
     // other
-    input  logic alu_bypass,    // bypass ALU, directly output 0 as result
-    input  logic fwd_imm,       // forward result to imm directly
+    input  logic fwd_imm,       // forward result to imm directly, alu bypass is emulated using decoder logic directly so fwd_imm serves as substituion for it
     // OUTPUTS:
     output Word  result,        // ALU result
     output logic alu_zero,      // goes to zero flag (if ALU result is zero)
@@ -44,9 +43,7 @@ module alu #(
         result = '0;
         alu_carry = 1'b0;
         alu_carry_upd = 1'b1;
-        if (alu_bypass) begin
-            result = '0;
-        end else if (fwd_imm) begin
+        if (fwd_imm) begin
             result = imm;
         end else begin
             case (alu_op)
