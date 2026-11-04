@@ -369,12 +369,11 @@ class Sim:
                     less = sa < sb
                 else:
                     less = a < b
-                self.wr(th, ins['rd'], 1 if less else 0)
-                th.flags &= ~(BIT['Z'] | BIT['N'])
-                if less:
-                    th.flags |= BIT['N']
-                if a == b:
-                    th.flags |= BIT['Z']
+                # three-way result: all ones if a < b, 1 if a > b, 0 if equal. Z and N then follow from the result like
+                # any other ALU operation (N = less, Z = equal). C is not changed.
+                res = M32 if less else (0 if a == b else 1)
+                self.wr(th, ins['rd'], res)
+                self.alu_flags(th, res)
             else:
                 sh = b & 31
                 self.shift(th, ins, a, sh, op == 'shl')

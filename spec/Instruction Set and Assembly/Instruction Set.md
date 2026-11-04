@@ -30,7 +30,7 @@ Instructions are classified into the following types -
     - There is no hardwired zero register, all 8 GPRs are usable.
     - Encoded instructions contain a dedicated write-back (WB) bit which tells if the result is to be written back to a register. Based on how the assembly instruction is written, the register is chosen to be updated accordingly.
         - Flags in the `FLAGS` register are always set, regardless of the WB bit.
-        - In nearly all cases, the `Z` flag is set to `1` if the result is all 0, and the `N` flag is set to `1` if the MSB is 1. The one exception is `cmp` and `cmpa`, as given below.
+        - In all cases, the `Z` flag is set to `1` if the result is all 0, and the `N` flag is set to `1` if the MSB is 1. The one exception is `cmp` and `cmpa`, as given below.
     - Sub-types include -
 
 |Instruction|Operation|
@@ -39,7 +39,7 @@ Instructions are classified into the following types -
 |`and`|Logical AND on two register values.|
 |`or`|Logical OR on two register values.|
 |`xor`|Logical XOR on two register values.|
-|`cmp`|Sets a register value to `1` if `rs1` is less than `rs2`. Performs an unsigned comparison. Sets `N` to `1` if less than and `Z` to `1` if equal to, and sets both to `0` otherwise.|
+|`cmp`|Sets a register value to 1 if rs1 is greater than rs2, -1 (so 0xFFFFFFFF) if `rs1` is lesser than `rs2`, and 0 if both are equal. Sets `N` to `1` if less than and `Z` to `1` if equal to, and sets both to `0` otherwise.|
 |`cmpa`|Same as `cmp` but performs a signed comparison instead.|
 |`shl`|Performs a logical left shift with zero extension on `rs1` by amount specified in `rs2`. Sets `C` flag to the last bit that was shifted out. A shift by 0 leaves `C` unchanged.|
 |`shr`|Performs a logical right shift with zero extension, otherwise same as above.|

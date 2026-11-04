@@ -63,10 +63,10 @@ instructions:
   # ------------------------------------------------------------------ RR (opcode 000), result written only if WB = 1
   - {name: add,  mnemonic: add,  type: RR, funct: 0, group: register_ops, stage: A, src: [rs1, rs2], dst: rd, dst_when: wb, alu: add,  b_src: rs2, flags: [Z, "N", C], c_rule: carry}
   - {name: xor,  mnemonic: xor,  type: RR, funct: 1, group: register_ops, stage: A, src: [rs1, rs2], dst: rd, dst_when: wb, alu: xor,  b_src: rs2, flags: [Z, "N"]}
-  - {name: shl,  mnemonic: shl,  type: RR, funct: 2, group: register_ops, stage: A, src: [rs1, rs2], dst: rd, dst_when: wb, alu: shl,  b_src: rs2, flags: [Z, "N", C], c_rule: shift_out, note: "rs2 is the shift amount (low 5 bits). A shift by 0 leaves C unchanged"}
-  - {name: shr,  mnemonic: shr,  type: RR, funct: 3, group: register_ops, stage: A, src: [rs1, rs2], dst: rd, dst_when: wb, alu: shr,  b_src: rs2, flags: [Z, "N", C], c_rule: shift_out, note: "logical shift right. A shift by 0 leaves C unchanged"}
-  - {name: cmp,  mnemonic: cmp,  type: RR, funct: 4, group: register_ops, stage: A, src: [rs1, rs2], dst: rd, dst_when: wb, alu: cmp,  b_src: rs2, flags: [Z, "N"], flag_rule: cmp, note: "unsigned. rd = 1 if rs1 < rs2. N = less, Z = equal, otherwise both 0"}
-  - {name: cmpa, mnemonic: cmpa, type: RR, funct: 5, group: register_ops, stage: A, src: [rs1, rs2], dst: rd, dst_when: wb, alu: cmpa, b_src: rs2, flags: [Z, "N"], flag_rule: cmp, note: "signed compare, same flag rules as cmp"}
+  - {name: shl,  mnemonic: shl,  type: RR, funct: 2, group: register_ops, stage: A, src: [rs1, rs2], dst: rd, dst_when: wb, alu: shl,  b_src: rs2, flags: [Z, "N", C], c_rule: shift_out, note: "logical shift left by n = rs2[4:0]. For n = 1 to 31, C = rs1[32-n] (the last bit shifted out through the MSB). A shift by 0 leaves C unchanged, Z and N still follow the result"}
+  - {name: shr,  mnemonic: shr,  type: RR, funct: 3, group: register_ops, stage: A, src: [rs1, rs2], dst: rd, dst_when: wb, alu: shr,  b_src: rs2, flags: [Z, "N", C], c_rule: shift_out, note: "logical shift right by n = rs2[4:0]. For n = 1 to 31, C = rs1[n-1] (the last bit shifted out through the LSB). A shift by 0 leaves C unchanged, Z and N still follow the result"}
+  - {name: cmp,  mnemonic: cmp,  type: RR, funct: 4, group: register_ops, stage: A, src: [rs1, rs2], dst: rd, dst_when: wb, alu: cmp,  b_src: rs2, flags: [Z, "N"], note: "unsigned three-way compare: rd = 1 if rs1 > rs2, -1 (0xFFFFFFFF) if rs1 < rs2, 0 if equal. Z and N follow from the result like any other ALU operation (N = less, Z = equal, both 0 if greater)"}
+  - {name: cmpa, mnemonic: cmpa, type: RR, funct: 5, group: register_ops, stage: A, src: [rs1, rs2], dst: rd, dst_when: wb, alu: cmpa, b_src: rs2, flags: [Z, "N"], note: "signed three-way compare, same result and flag rules as cmp"}
   - {name: and,  mnemonic: and,  type: RR, funct: 6, group: register_ops, stage: A, src: [rs1, rs2], dst: rd, dst_when: wb, alu: and,  b_src: rs2, flags: [Z, "N"]}
   - {name: or,   mnemonic: or,   type: RR, funct: 7, group: register_ops, stage: A, src: [rs1, rs2], dst: rd, dst_when: wb, alu: or,   b_src: rs2, flags: [Z, "N"]}
 
@@ -113,6 +113,7 @@ instructions:
     flags: [Z, "N", C]
     c_rule: shift_out
     fields: {imm: {bits: ["9:6"]}}
+    note: "logical shift left by n = imm (0 to 15). For n = 1 to 15, C = rs1[32-n] (the last bit shifted out through the MSB). A shift by 0 leaves C unchanged, Z and N still follow the result"
   - name: shri
     mnemonic: shri
     type: RI-A
@@ -127,6 +128,7 @@ instructions:
     flags: [Z, "N", C]
     c_rule: shift_out
     fields: {imm: {bits: ["9:6"]}}
+    note: "logical shift right by n = imm (0 to 15). For n = 1 to 15, C = rs1[n-1] (the last bit shifted out through the LSB). A shift by 0 leaves C unchanged, Z and N still follow the result"
 
   # ------------------------------------------------------------------ RI-Z (opcode 011), rd always written, no flags
   - name: lb

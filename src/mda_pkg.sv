@@ -92,8 +92,8 @@ package mda_pkg;
     localparam AluOp ALU_XOR   = 4'd1;
     localparam AluOp ALU_SHL   = 4'd2;
     localparam AluOp ALU_SHR   = 4'd3;
-    localparam AluOp ALU_CMP   = 4'd4;                      // unsigned compare: result = (a < b), N = less, Z = equal
-    localparam AluOp ALU_CMPA  = 4'd5;                      // signed compare
+    localparam AluOp ALU_CMP   = 4'd4;                      // unsigned three-way compare: 1 if a > b, all ones if a < b, 0 if equal
+    localparam AluOp ALU_CMPA  = 4'd5;                      // signed three-way compare
     localparam AluOp ALU_AND   = 4'd6;
     localparam AluOp ALU_OR    = 4'd7;
     localparam AluOp ALU_PASSB = 4'd8;                      // result = b                  (lbi, first half of lli)

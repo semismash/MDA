@@ -163,8 +163,10 @@ Registers the decoder outputs and operands at the end of ID. Inputs are the deco
 | `op` | in | 4 | |
 | `a`, `b` | in | 32 each | |
 | `y` | out | 32 | |
-| `z`, `n` | out | 1 each | Per-instruction rules (`cmp`/`cmpa`: `N` = less, `Z` = equal) |
+| `z`, `n` | out | 1 each | Derived from `y` for every operation: `z = ~(\|y)`, `n = y[31]` |
 | `c`, `c_upd` | out | 1 each | Carry or shifted-out bit, and whether to update `C` (not for logic ops or a shift by 0) |
+
+For `cmp` and `cmpa`, `y` is the three-way result: bits `[31:1]` are `lt` and bit 0 is `lt | ~eq`, so `y` is all ones when less, `0` when equal and `1` when greater. The flags then need no special case.
 
 `mda_shifter`: `a[31:0]`, `amt[4:0]`, `left` in; `y[31:0]`, `c_out` out. It is shared with `pull`/`push` in Stage B.
 
