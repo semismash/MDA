@@ -46,6 +46,8 @@ flags:
   PE: 11
   OVR: 12
   TMR: 13
+  SPARE_0: 14
+  SPARE_1: 15
 
 fault_causes:
   MISALIGNED: 0

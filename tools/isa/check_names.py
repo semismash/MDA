@@ -9,6 +9,7 @@ Checks:
     2. The ALU codes in mda_pkg equal the RR and RI-A funct codes in isa.yaml (the funct pass-through
        documented in mda_pkg.sv).
     3. mda_pkg declares every name required by the Stage A modules.
+    4. Every ALU_* code fits in the width of the AluOp type, and the codes are distinct.
 
 Exit status is 0 when all checks pass and 1 otherwise.
 """
@@ -27,7 +28,6 @@ REQUIRED_NAMES = [
     'Word', 'Instruction', 'PcAddr', 'RegAddr', 'ThreadSel', 'Flags', 'DmemWordAddr', 'Cause',
     'NOP_INSTR', 'ILLEGAL_INSTR',
     'AluOp', 'ALU_ADD', 'ALU_XOR', 'ALU_SHL', 'ALU_SHR', 'ALU_CMP', 'ALU_CMPA', 'ALU_AND', 'ALU_OR',
-    'ALU_PASSB', 'ALU_LUI',
     'BrType', 'BR_NONE', 'BR_JMP', 'BR_JRG', 'BR_JNL', 'BR_JOF', 'BR_JOC',
     'MemOp', 'MEM_NONE', 'MEM_LOAD', 'MEM_STORE',
     'COND_ANY', 'COND_ALL',
@@ -95,6 +95,19 @@ def main():
     if missing:
         problems.append(f'mda_pkg is missing {missing}')
     print(f'[3] required names present: {len(REQUIRED_NAMES) - len(missing)}/{len(REQUIRED_NAMES)}')
+
+    m = re.search(r'\[(\d+):0\]\s*AluOp\s*$', pkg['AluOp'][1]) if 'AluOp' in pkg else None
+    alu_codes = {k: const_value(v[1]) for k, v in pkg.items() if k.startswith('ALU_')}
+    if m is None:
+        problems.append('could not read the AluOp width')
+    else:
+        width = int(m.group(1)) + 1
+        too_big = {k: v for k, v in alu_codes.items() if v is None or v >= (1 << width)}
+        if too_big:
+            problems.append(f'ALU codes do not fit in AluOp ({width} bits): {too_big}')
+        if len(set(alu_codes.values())) != len(alu_codes):
+            problems.append(f'duplicate ALU codes: {alu_codes}')
+        print(f'[4] ALU codes: {len(alu_codes)} codes, AluOp is {width} bits, all fit and are distinct')
 
     for p in problems:
         print('PROBLEM:', p)

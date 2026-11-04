@@ -113,6 +113,8 @@ package mda_isa_pkg;
   localparam int FLAG_PE = 11;
   localparam int FLAG_OVR = 12;
   localparam int FLAG_TMR = 13;
+  localparam int FLAG_SPARE_0 = 14;
+  localparam int FLAG_SPARE_1 = 15;
 
   // ---- fault causes (Events.md)
   localparam logic [2:0] CAUSE_MISALIGNED = 3'd0;

@@ -87,17 +87,15 @@ package mda_pkg;
     // codes 0 to 3 map to add, xor, shl, shr. A decoder may therefore pass the
     // funct field through unchanged. This is a deliberate dependency on
     // tools/isa/isa.yaml, verified by tools/isa/check_names.py.
-    typedef logic [3:0] AluOp;
-    localparam AluOp ALU_ADD   = 4'd0;
-    localparam AluOp ALU_XOR   = 4'd1;
-    localparam AluOp ALU_SHL   = 4'd2;
-    localparam AluOp ALU_SHR   = 4'd3;
-    localparam AluOp ALU_CMP   = 4'd4;                      // unsigned three-way compare: 1 if a > b, all ones if a < b, 0 if equal
-    localparam AluOp ALU_CMPA  = 4'd5;                      // signed three-way compare
-    localparam AluOp ALU_AND   = 4'd6;
-    localparam AluOp ALU_OR    = 4'd7;
-    localparam AluOp ALU_PASSB = 4'd8;                      // result = b                  (lbi, first half of lli)
-    localparam AluOp ALU_LUI   = 4'd9;                      // result = {b[7:0], a[23:0]}  (lui)
+    typedef logic [2:0] AluOp;
+    localparam AluOp ALU_ADD   = 3'd0;
+    localparam AluOp ALU_XOR   = 3'd1;
+    localparam AluOp ALU_SHL   = 3'd2;
+    localparam AluOp ALU_SHR   = 3'd3;
+    localparam AluOp ALU_CMP   = 3'd4;                      // unsigned three-way compare: 1 if a > b, all ones if a < b, 0 if equal
+    localparam AluOp ALU_CMPA  = 3'd5;                      // signed three-way compare
+    localparam AluOp ALU_AND   = 3'd6;
+    localparam AluOp ALU_OR    = 3'd7;
 
     // Jump kind.
     typedef logic [2:0] BrType;
