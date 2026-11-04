@@ -67,6 +67,38 @@ With no loader and no pins, the synthesizer would remove most of the design. The
 ### D9. Trace port (always present, left open at the TT wrapper).
 Do not use `ifdef` for this: synthesis removes the unused logic anyway, and the port set stays identical in simulation and formal. Fields, all registered at the end of EX: `tr_valid`, `tr_t` (thread, one-hot), `tr_pc`, `tr_instr`, `tr_rd_we`, `tr_rd`, `tr_wdata`, `tr_flags_we`, `tr_flags`, `tr_taken`, `tr_next_pc`, `tr_mem_we`, `tr_mem_addr`, `tr_mem_wdata`, `tr_fault`, `tr_cause`; plus a second event for a load return one cycle later (`tr_ld_valid`, `tr_ld_t`, `tr_ld_rd`, `tr_ld_data`). This is the interface that the lockstep checker against the reference model compares.
 
+### D10. Reset policy.
+
+`rst_n` resets control state only. Data storage is never reset. A flop is reset when a wrong value after reset would change what the machine does. Register files, memories and pipeline payload are not reset.
+
+**Distribution.** `rst_n` is active low. `mda_tt_top` passes the pin through the 2-flop synchronizer (`mda_sync`, `W` = 1). The synchronized signal drives the asynchronous reset input of every resettable flop (`always_ff @(posedge clk or negedge rst_n)`). Assertion therefore reaches the design up to two clock cycles after the pin, and release is synchronous to `clk`. Reset is held for at least three cycles on the board and at least five in testbenches. Resettable control flops and unreset payload flops are written in separate `always_ff` blocks, because the reset branch of a block resets every register assigned in it.
+
+**Sequence.** Reset leaves `run` low and the design idle. A testbench or the loader then fills IMEM and DMEM and pulses `go` for one cycle. `go` loads the three entry PCs and sets `run`. Thread 0 is in IF in the first cycle with `run` high, and the first valid instruction reaches EX two cycles later.
+
+| State | Module | Reset | Reason |
+|---|---|---|---|
+| `run` | `mda_core` | Yes, low | Nothing executes until `go` |
+| Scheduler ring position | `mda_sched` | Yes, thread 0 in IF | All threads start in a known slot |
+| `id_v`, `ex_v` | `mda_sched` | Yes, low | No instruction is in ID or EX after reset |
+| `valid` | `mda_id_ex` | Yes, low | A stale valid bit would execute garbage |
+| `ld_valid` | `mda_lsu` | Yes, low | A stale load return would write a register bank |
+| `suffix_pend` (per thread) | `mda_core` | Yes, low | A stale flag would decode the first word as an `lli` suffix |
+| Flags `Z`, `N`, `C` | `mda_flags` | Yes, 0 | Start state in `Threading.md` |
+| Trace hash | `mda_tt_top` | Yes, 0 | Observable output of the hardening harness |
+| PCs | `mda_fetch` | No | Loaded by `go`. Fetch is disabled while `run` is low |
+| GPRs | `mda_regfile` | **No** | Uninitialized by specification. Random-initial-state tests rely on this |
+| Operands, immediates, control and instruction bits in `mda_id_ex` | `mda_id_ex` | No | Payload, qualified by `valid` |
+| `ld_rd`, `ld_lane`, `ld_byte` | `mda_lsu` | No | Payload, qualified by `ld_valid` |
+| IMEM and DMEM | macros | No | The macros have no reset. The loader or testbench fills them |
+
+Stage B adds the following reset state, matching the start state in `Threading.md`: the event flags (all clear, `OSR_EMPTY` set), sleep state, timers (disarmed), doorbells (clear), pin configuration (output off, roles cleared, watchers off, event bits clear, default owners), shift-engine busy state (idle), the loader state machine with its sticky error latch, and CRC accumulators. Not reset: the pin synchronizer flops (data) and ISR/OSR contents ("empty" is a flag). Whether the engine configuration registers (divisor, control) are reset is not specified and remains to be decided.
+
+**Verification.**
+- Assertions: after reset and before `go`, no register write, memory write or PC change occurs, and `A_WEN` of both macros stays low. After `go`, the first valid instruction reaches EX exactly two cycles after the first IF.
+- Control state is known after reset in a 4-state simulator (no `X` on any reset flop).
+- Data state is randomized, not reset. Verilator is run with `--x-initial unique` and `+verilator+rand+reset+2` with different seeds, and the determinism tests require identical traces across seeds.
+- `mda_sched` is checked formally: exactly one thread per stage after reset and in every later cycle.
+
 ## 2. Updated Stage A file list
 
 Compared with the earlier file tree: `mda_if_id` removed (D2), `mda_pc` merged into `mda_fetch` (a standalone PC module would be a thin wrapper), `mda_ex` removed (pure wiring, `mda_core` instantiates its children directly), and `mda_spatial` moved to Stage B. That makes **21 `src/` files plus the 2 macro stubs for Stage A**:
@@ -152,7 +184,7 @@ A 3-bit one-hot ring, nothing else. Keep it small so formal can prove "exactly o
 | `if_t` | in | 3 | Bank for the load-return write |
 | `w_ld_we`, `w_ld_idx`, `w_ld_data` | in | 1, 3, 32 | |
 
-No reset on the registers (the spec leaves them uninitialized). Add an assertion that `ex_t` and `if_t` banks never write in the same cycle with the same bank (they cannot, by D1).
+No reset on the registers (the spec leaves them uninitialized), so the module has no `rst_n` port (D10). Add an assertion that `ex_t` and `if_t` banks never write in the same cycle with the same bank (they cannot, by D1).
 
 ### `mda_id_ex`
 Registers the decoder outputs and operands at the end of ID. Inputs are the decoder outputs plus `opa` (rs1 value), `opb` (`b_imm ? imm : rs2 value`), `sdata` (rs2 value, for stores), and `instr` (for the trace only). Outputs are the same signals, registered, and a `valid` bit.

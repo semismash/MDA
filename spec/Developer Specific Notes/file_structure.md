@@ -1,9 +1,5 @@
 # MDA File Structure
 
-## Targets
-
-- 
-
 ## Expected File Structure
 
 ```txt
@@ -27,9 +23,9 @@ src/mda_pc.sv                              # A
 src/mda_if_id.sv                           # A
 src/mda_id_ex.sv                           # A
 src/mda_decoder.sv                         # A (decodes all 35 instructions)
-src/mda_regfile.sv                         # A
+src/mda_regfile.sv                         # A (X)
 src/mda_ex.sv                              # A
-src/mda_alu.sv                             # A
+src/mda_alu.sv                             # A (X)
 src/mda_shifter.sv                         # A
 src/mda_branch_unit.sv                     # A
 src/mda_lsu.sv                             # A
