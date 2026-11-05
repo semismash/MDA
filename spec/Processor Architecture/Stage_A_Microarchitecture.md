@@ -38,18 +38,21 @@ The ID-stage path is then macro clock-to-out (6.4-7.4 ns slow) + decode + regist
 
 IF increments the PC of the IF thread and EX overwrites the PC of the EX thread. These are different threads in every cycle, so there is no conflict.
 
-### D4. `lli` as two micro-operations.
-The instruction word carries the upper byte `[23:16]`, and the suffix halfword carries `[15:0]`.
-- Slot 1 (the `lli` itself): write `rd = imm8 << 16`.
-- Slot 2 (the suffix): write `rd = rd | suffix`. The decoder treats the suffix word as raw data, not as an instruction, because `suffix_pend[t]` is set.
-- Per-thread state: `suffix_pend` (1 bit) and `suffix_rd` (3 bits), 12 flops in total, kept in `mda_core`. The suffix slot reads `rd` through port A (`rs1_idx = suffix_rd`), ORs the zero-extended suffix with it in the ALU, writes it back, and **does not update flags** (`lli` sets none).
-- A jump that lands on a suffix address finds `suffix_pend = 0` and decodes it as an ordinary instruction, as the spec requires.
-- The alternative of holding `imm8` per thread costs 33 flops; the 12-flop version is preferred.
+### D4. `lli` as a hold-then-build constant.
+The instruction word (word A) carries the upper byte `[23:16]` of the constant, and the suffix halfword (word B) carries `[15:0]`.
+- **Word A** executes as a no-operation. The decoder raises `lli_first`, and `mda_suffix` captures `rd` and `imm8` for the thread in ID and marks a suffix as pending.
+- **Word B (the suffix slot):** `suffix_pend` tells the decoder to treat the word as data. The immediate generator builds the whole constant `{8'b0, suffix_imm8, instr}`, the ALU forwards it (`fwd_imm`), and `rd = suffix_rd` is written once. The result is a single architectural register write and a single trace event, at the suffix slot. No intermediate value appears in `rd`, and the suffix slot needs no register read.
+- **State:** `mda_suffix` holds, per thread, a pending bit (reset), `rd` (3 bits) and `imm8` (8 bits) (unreset payload, qualified by the pending bit). That is 36 flops in total. The alternative of two micro-operations that merge in the register file needs 12 flops but writes `rd` twice and needs a register read in the suffix slot.
+- **A jump that lands directly on a suffix word** finds the pending bit clear, and the word decodes as an ordinary instruction, as the spec requires.
+- The next instruction of the thread is in ID three cycles after the suffix slot's ID, one cycle after its write, so no forwarding is needed.
+- Neither slot updates flags.
 
-The checks to cover in tests: a flag-setting instruction right before `lli`, `lli` followed by a jump to its own suffix address, and `lli` as the last word before the PC wraps.
+The scheme was checked at model level against the direct meaning of `lli` over 5,000 random three-thread programs (random suffix words, junk words, and 2,009 jumps that landed directly on suffix words), with no mismatches. Three deliberate breaks of the scheme (one shared buffer entry, suffix decoded as an instruction, pending bit never cleared) were all caught.
+
+The checks to cover in RTL tests: a flag-setting instruction right before `lli`, `lli` followed by a jump to its own suffix address, `lli` as the last word before the PC wraps, back-to-back `lli` words, all three threads interleaving `lli`, and a suffix word that looks like an `lli` or an illegal encoding.
 
 ### D5. Flags.
-Z, N, C live per thread in `mda_flags`. Instructions that set flags: `add xor and or cmp cmpa shl shr addi xori shli shri`. Nothing else does (`lbi`/`lli`/`lui`, loads, stores and jumps leave them alone). `C` is updated by `add`/`addi`, and by shifts only when the amount is not 0. A branch in EX reads the flags written 3 cycles earlier by the thread's previous instruction. Event flags join `mda_flags` in Stage B, so it exposes a 16-bit view from the start (bits above 2 read as 0).
+Z, N, C live per thread in `mda_flags`. Instructions that set flags: `add xor and or cmp cmpa shl shr addi xori shli shri`. Nothing else does (`lbi`/`lli`/`lui`, loads, stores and jumps leave them alone). `C` is updated by `add`/`addi`, and by shifts only when the amount is not 0. The ALU output `alu_carry_upd` encodes exactly this (high for add and for a shift by a nonzero amount, low for every other operation), so the decoder needs a single flag enable (`f_u_alu`) and the flags module receives `u_alu_carry = u_alu & alu_carry_upd`. A branch in EX reads the flags written 3 cycles earlier by the thread's previous instruction. Event flags join `mda_flags` in Stage B, so it exposes a 16-bit view from the start (bits above 2 read as 0).
 
 ### D6. Faults in Stage A.
 The LSU produces `fault` and `fault_cause` (misaligned `000`, out of bounds `001`) and the decoder produces `illegal` (`110`). The faulting store is suppressed (`A_MEN` low), the faulting load returns 0, and illegal instructions execute as no-ops. Stage A only **exposes** the faults on the trace port. The `ERR` flag and cause latching arrive with `mda_events` in Stage B. Timing is never affected, as the spec requires.
@@ -82,7 +85,8 @@ Do not use `ifdef` for this: synthesis removes the unused logic anyway, and the 
 | `id_v`, `ex_v` | `mda_sched` | Yes, low | No instruction is in ID or EX after reset |
 | `valid` | `mda_id_ex` | Yes, low | A stale valid bit would execute garbage |
 | `ld_valid` | `mda_lsu` | Yes, low | A stale load return would write a register bank |
-| `suffix_pend` (per thread) | `mda_core` | Yes, low | A stale flag would decode the first word as an `lli` suffix |
+| `suffix_pend` (per thread) | `mda_suffix` | Yes, low | A stale flag would decode the first word as an `lli` suffix |
+| Captured `rd` and `imm8` of a pending `lli` | `mda_suffix` | No | Payload, qualified by `suffix_pend` |
 | Flags `Z`, `N`, `C` | `mda_flags` | Yes, 0 | Start state in `Threading.md` |
 | Trace hash | `mda_tt_top` | Yes, 0 | Observable output of the hardening harness |
 | PCs | `mda_fetch` | No | Loaded by `go`. Fetch is disabled while `run` is low |
@@ -101,10 +105,10 @@ Stage B adds the following reset state, matching the start state in `Threading.m
 
 ## 2. Updated Stage A file list
 
-Compared with the earlier file tree: `mda_if_id` removed (D2), `mda_pc` merged into `mda_fetch` (a standalone PC module would be a thin wrapper), `mda_ex` removed (pure wiring, `mda_core` instantiates its children directly), and `mda_spatial` moved to Stage B. That makes **21 `src/` files plus the 2 macro stubs for Stage A**:
+Compared with the earlier file tree: `mda_if_id` removed (D2), `mda_pc` merged into `mda_fetch` (a standalone PC module would be a thin wrapper), `mda_ex` removed (pure wiring, `mda_core` instantiates its children directly), and `mda_spatial` moved to Stage B. That makes **23 `src/` files plus the 2 macro stubs for Stage A** (`mda_suffix` and `mda_imm_gen` were split out of the decoder):
 
 ```
-mda_pkg  mda_isa_pkg  mda_tt_top  mda_top  mda_core  mda_sched  mda_fetch  mda_id_ex  mda_decoder
+mda_pkg  mda_isa_pkg  mda_tt_top  mda_top  mda_core  mda_sched  mda_fetch  mda_id_ex  mda_decoder  mda_suffix  mda_imm_gen
 mda_regfile  mda_alu  mda_shifter  mda_branch_unit  mda_cond  mda_flags  mda_lsu  mda_wb
 mda_imem  mda_dmem  mda_sram_sim  mda_sync
 RM_IHPSG13_1P_1024x16_c2_bm_bist.v   RM_IHPSG13_1P_256x32_c2_bm_bist.v
@@ -149,29 +153,8 @@ A 3-bit one-hot ring, nothing else. Keep it small so formal can prove "exactly o
 | `imem_addr` | out | IMEM_ADDR_WIDTH | `pc[if_t]`, to `mda_imem` |
 | `ex_pc` | out | IMEM_ADDR_WIDTH | `pc[ex_t]` = instruction address + 1 |
 
-### `mda_decoder`
-| Port | Dir | Width | Description |
-|---|---|---|---|
-| `instr` | in | 16 | Word from IMEM |
-| `suffix_pend`, `suffix_rd` | in | 1, 3 | Per-thread suffix state of the thread in ID (selected in `mda_core`) |
-| `rs1_idx`, `rs2_idx` | out | 3 each | Register read indices (`rs1_idx` = `rd` for `lui`, = `suffix_rd` for a suffix) |
-| `rd_idx` | out | 3 | Destination |
-| `rd_we` | out | 1 | An EX-stage register write (ALU, immediates, link) |
-| `res_link` | out | 1 | The result is the link value (`jmp`, `jrg`), not the ALU output |
-| `alu_op` | out | 4 | |
-| `imm` | out | 32 | Extended immediate (`lli` slot 1: `imm8 << 16`; suffix: zero-extended word) |
-| `b_imm` | out | 1 | Operand B is the immediate |
-| `flag_zn_we`, `flag_c_we` | out | 1 each | Flag updates |
-| `br_type` | out | 3 | |
-| `br_off` | out | IMEM_ADDR_WIDTH | Sign-extended, truncated to the PC width |
-| `jof_flag` | out | 4 | Flag index for `jof` |
-| `br_inv`, `joc_all` | out | 1, 1 | Condition variants (`COND_ANY` / `COND_ALL`; the invert option is `br_inv`) |
-| `mem_op` | out | 2 | None, load, store |
-| `mem_byte` | out | 1 | |
-| `mem_off` | out | 5 | Unscaled offset |
-| `sp_valid`, `sp_op`, `sp_imm` | out | 1, 5, 10 | Spatial/temporal/event instructions, decoded for Stage B and ignored in Stage A |
-| `lli_first` | out | 1 | Set `suffix_pend` for the thread |
-| `illegal` | out | 1 | Undefined encoding or reserved bits set (never checked on a suffix) |
+### `mda_decoder`, `mda_suffix`, `mda_imm_gen`
+The ports of these three blocks, the immediate formats, the decoding rules and the draft decode matrix are specified in `Decoder_Interface.md`, which supersedes the proposal that was listed here. In outline: `mda_decoder` is a combinational function of `instr`, `suffix_pend` and `suffix_rd`. `mda_suffix` holds the per-thread suffix state (D4). `mda_imm_gen` builds the 32-bit immediate from `instr`, `imm_sel`, `rs1_data` (only for `lui`) and `suffix_imm8`.
 
 ### `mda_regfile`
 | Port | Dir | Width | Description |
@@ -196,7 +179,7 @@ Registers the decoder outputs and operands at the end of ID. Inputs are the deco
 | `a`, `b` | in | 32 each | |
 | `y` | out | 32 | |
 | `z`, `n` | out | 1 each | Derived from `y` for every operation: `z = ~(\|y)`, `n = y[31]` |
-| `c`, `c_upd` | out | 1 each | Carry or shifted-out bit, and whether to update `C` (not for logic ops or a shift by 0) |
+| `c`, `c_upd` | out | 1 each | Carry or shifted-out bit, and whether the operation updates `C`: high for add and for a shift by a nonzero amount, low for every other operation |
 
 For `cmp` and `cmpa`, `y` is the three-way result: bits `[31:1]` are `lt` and bit 0 is `lt | ~eq`, so `y` is all ones when less, `0` when equal and `1` when greater. The flags then need no special case.
 
@@ -232,7 +215,7 @@ Inputs: `ex_t`, `ex_v`, `zn_we`, `z_in`, `n_in`, `c_we`, `c_in`. Output: `flags_
 | `ld_valid`, `ld_rd`, `ld_data` | out | 1, 3, 32 | Load return for the thread now in IF (zero on a fault, lane-selected for bytes) |
 
 ### `mda_wb`
-Combines the EX result mux (ALU output or link) with the register write requests for both paths. Inputs: `ex_v`, `rd_we`, `rd_idx`, `res_link`, `alu_y`, `link`, `ld_valid`, `ld_rd`, `ld_data`. Outputs: `w_ex_we/idx/data` and `w_ld_we/idx/data`, as seen by `mda_regfile`.
+Combines the EX result mux (ALU output or link) with the register write requests for both paths. Inputs: `ex_v`, `rd_we`, `rd_idx`, `res_sel`, `alu_y`, `link`, `ld_valid`, `ld_rd`, `ld_data`. Outputs: `w_ex_we/idx/data` and `w_ld_we/idx/data`, as seen by `mda_regfile`.
 
 ### `mda_imem`
 | Port | Dir | Width | Description |
@@ -260,7 +243,7 @@ Parameters `AW`, `DW`. One port, synchronous read with a registered output, per-
 Parameter `W`. `d[W-1:0]` in, `q[W-1:0]` out, 2-flop synchronizer. Instantiated for reset in `mda_tt_top`, and for pins in Stage B.
 
 ### `mda_core`
-Ports: `clk`, `rst_n`, `go`, `entry_pc[3*IMEM_ADDR_WIDTH]`, the IMEM interface (`imem_addr`, `imem_data`, `imem_en`), the DMEM interface (the `dm_*` signals above), and the trace port (D9). It owns `suffix_pend`/`suffix_rd`, selects them with `id_t`, and instantiates `mda_sched`, `mda_fetch`, `mda_decoder`, `mda_regfile`, `mda_id_ex`, `mda_alu`, `mda_branch_unit`, `mda_flags`, `mda_lsu` and `mda_wb`.
+Ports: `clk`, `rst_n`, `go`, `entry_pc[3*IMEM_ADDR_WIDTH]`, the IMEM interface (`imem_addr`, `imem_data`, `imem_en`), the DMEM interface (the `dm_*` signals above), and the trace port (D9). It instantiates `mda_sched`, `mda_fetch`, `mda_decoder`, `mda_suffix` (selected with `id_t`), `mda_imm_gen`, `mda_regfile`, `mda_id_ex`, `mda_alu`, `mda_branch_unit`, `mda_flags`, `mda_lsu` and `mda_wb`.
 
 ### `mda_top`
 `mda_core` + `mda_imem` + `mda_dmem`, with the loader write ports and the trace exposed as plain ports. Stage B adds the I/O and event blocks.

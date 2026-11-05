@@ -1,4 +1,3 @@
-# Instruction Encoding
 There are 8 encoding types of instructions in the MDA ISA, plus the suffix halfword which follows `lli`. They are `RR`, `RI-A`, `RI-Z`, `DI-L`, `DI-Z`, `NX`, `RX`, `SX` and the `SUFFIX`. There are 35 instructions, which are encoded in 37 opcode and FUNCT combinations, as `jof` and `joc` each have two variants (see the section on variants).
 
 - Instructions are 16 bits long. The loader sends them as 16-bit units, so there is no byte order on the load path. In a byte-oriented file (e.g. a hex dump), the low byte comes first (little-endian).
@@ -33,7 +32,7 @@ The following types of fields include -
 The bit layouts of the types are given as follows (bit 15 to bit 0) -
 
 - RR Type - `[(15:13) RD, (12:10) RS1, (9:7) RS2, (6:6) WB, (5:3) FUNCT, (2:0) OPCODE]`
-- RI-A Type - `[(15:13) RD, (12:10) RS1, (9:6) IMM[3:0], (5:5) WB, (4:3) FUNCT, (2:0) OPCODE]`
+- RI-A Type - `[(15:13) RD, (12:10) RS1, (9:7) IMM[3:1], (6:6) WB, (5:5) IMM[0], (4:3) FUNCT, (2:0) OPCODE]`
 - RI-Z Type - `[(15:13) RD, (12:10) RS1, (9:5) IMM[4:0], (4:3) FUNCT, (2:0) OPCODE]`
 - DI-L and DI-Z Types - `[(15:13) RD, (12:5) IMM[7:0], (4:3) FUNCT, (2:0) OPCODE]`
 - NX Type - `[(15:6) IMM[9:0], (5:3) FUNCT, (2:0) OPCODE]`
@@ -91,21 +90,21 @@ All RR instructions are encoded as `[RD, RS1, RS2, WB, FUNCT, 000]`, and have no
 |`xor`|`xor rd, rs1, rs2`|`001`|Sets `Z`, `N`|
 |`shl`|`shl rd, rs1, rs2`|`010`|`rs2` is the shift amount. Sets `Z`, `N`, `C`|
 |`shr`|`shr rd, rs1, rs2`|`011`|`rs2` is the shift amount. Sets `Z`, `N`, `C`|
-|`cmp`|`cmp rd, rs1, rs2`|`100`|Unsigned compare. `N` is set if less, `Z` if equal, otherwise both are 0|
+|`cmp`|`cmp rd, rs1, rs2`|`100`|Unsigned compare, `rd` = 1 if `rs1` < `rs2`. `N` is set if less, `Z` if equal, otherwise both are 0|
 |`cmpa`|`cmpa rd, rs1, rs2`|`101`|The same, signed|
 |`and`|`and rd, rs1, rs2`|`110`|Sets `Z`, `N`|
 |`or`|`or rd, rs1, rs2`|`111`|Sets `Z`, `N`|
 
 #### RI-A Type (OPCODE `010`)
 
-Encoded as `[RD, RS1, IMM[3:0] (bits 9:6), WB (bit 5), FUNCT, 010]`. The immediate is 4 bits. `rd` is written only if `WB` is 1. The flags are always set.
+Encoded as `[RD, RS1, IMM[3:1] (bits 9:7), WB (bit 6), IMM[0] (bit 5), FUNCT, 010]`. The immediate is 4 bits, split around the `WB` bit (`IMM[3:1]` is bits 9:7 and `IMM[0]` is bit 5), and `WB` is bit 6 as in the RR type. `rd` is written only if `WB` is 1. The flags are always set.
 
 |Instruction|Assembly|FUNCT|Immediate|
 |---|---|---|---|
-|`addi`|`addi rd, rs1, imm`|`00`|`IMM[3:0]` = bits 9:6, signed, -8 to 7. Sets `C` on carry|
-|`xori`|`xori rd, rs1, imm`|`01`|`IMM[3:0]` = bits 9:6, signed, -8 to 7 (-1 is a NOT)|
-|`shli`|`shli rd, rs1, imm`|`10`|`IMM[3:0]` = bits 9:6, unsigned, the shift amount, 0 to 15|
-|`shri`|`shri rd, rs1, imm`|`11`|`IMM[3:0]` = bits 9:6, unsigned, the shift amount, 0 to 15|
+|`addi`|`addi rd, rs1, imm`|`00`|`IMM[3:1]` = bits 9:7 and `IMM[0]` = bit 5, signed, -8 to 7. Sets `C` on carry|
+|`xori`|`xori rd, rs1, imm`|`01`|`IMM[3:1]` = bits 9:7 and `IMM[0]` = bit 5, signed, -8 to 7 (-1 is a NOT)|
+|`shli`|`shli rd, rs1, imm`|`10`|`IMM[3:1]` = bits 9:7 and `IMM[0]` = bit 5, unsigned, the shift amount, 0 to 15|
+|`shri`|`shri rd, rs1, imm`|`11`|`IMM[3:1]` = bits 9:7 and `IMM[0]` = bit 5, unsigned, the shift amount, 0 to 15|
 
 #### RI-Z Type (OPCODE `011`)
 
@@ -199,8 +198,8 @@ The following examples are computed from the layouts above -
 |Instruction|Word|Binary|
 |---|---|---|
 |`add r0, r5, r6`|`0x1740`|`0001011101000000`|
-|`xori @na, r7, -1`|`0x1FCA`|`0001111111001010`|
-|`addi r1, r2, -4`|`0x2B22`|`0010101100100010`|
+|`xori @na, r7, -1`|`0x1FAA`|`0001111110101010`|
+|`addi r1, r2, -4`|`0x2B42`|`0010101101000010`|
 |`lw r3, 3(r2)`|`0x686B`|`0110100001101011`|
 |`jrg r1, r1, 0`|`0x2413`|`0010010000010011`|
 |`lbi r1, 200`|`0x390E`|`0011100100001110`|

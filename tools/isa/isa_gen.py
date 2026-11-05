@@ -411,18 +411,25 @@ def gen_pkg(isa):
     a('  localparam int RS1_HI = 12, RS1_LO = 10;')
     a('  localparam int RS2_HI = 9,  RS2_LO = 7;')
     a('')
+    a('  // ---- types')
+    a('  typedef logic [2:0] OpCode;     // opcode, instruction word bits [2:0]')
+    a('  typedef logic [2:0] Funct3;     // 3-bit funct field (RR, NX and RX types, instr[5:3])')
+    a('  typedef logic [1:0] Funct2;     // 2-bit funct field (RI-A, RI-Z, SX, DI-L and DI-Z types, instr[4:3])')
+    a('  typedef logic [2:0] RpinMode;   // rpin mode field, instr[7:5]')
+    a('  typedef logic [2:0] CfgTarget;  // cfg target field, instr[8:6]')
+    a('')
     a('  // ---- opcodes (instruction word bits [2:0])')
     for t in sorted(isa.types.values(), key=lambda x: x.opcode):
-        a(f"  localparam logic [2:0] OPC_{sv_name(t.name)} = 3'd{t.opcode};")
+        a(f"  localparam OpCode OPC_{sv_name(t.name)} = 3'd{t.opcode};")
     a('')
     a('  // ---- funct codes. RR, NX and RX use word bits [5:3]; the other types use bits [4:3]')
     for t in sorted(isa.types.values(), key=lambda x: x.opcode):
         hi, lo = t.funct
         a(f'  // {t.name}: funct = instr[{hi}:{lo}]')
         for i in sorted([i for i in isa.instrs if i.type is t], key=lambda x: x.funct):
-            a(f"  localparam logic [{t.funct_w - 1}:0] FN_{sv_name(t.name)}_{i.name.upper()} = {t.funct_w}'d{i.funct};")
+            a(f"  localparam Funct{t.funct_w} FN_{sv_name(t.name)}_{i.name.upper()} = {t.funct_w}'d{i.funct};")
         for u in t.unused:
-            a(f"  localparam logic [{t.funct_w - 1}:0] FN_{sv_name(t.name)}_UNUSED{u} = {t.funct_w}'d{u};   // illegal")
+            a(f"  localparam Funct{t.funct_w} FN_{sv_name(t.name)}_UNUSED{u} = {t.funct_w}'d{u};   // illegal")
     a('')
     a('  // ---- reserved-field masks: an instruction is illegal if (instr & RSV_x) != 0')
     for i in isa.instrs:
@@ -434,9 +441,9 @@ def gen_pkg(isa):
     a('')
     a('  // ---- rpin modes, cfg targets (targets 6 and 7 are a bad cfg at run time, not illegal words)')
     for k, v in isa.y['rpin_modes'].items():
-        a(f"  localparam logic [2:0] RPIN_{k} = 3'd{v};")
+        a(f"  localparam RpinMode RPIN_{k} = 3'd{v};")
     for k, v in isa.y['cfg_targets'].items():
-        a(f"  localparam logic [2:0] CFG_TGT_{k} = 3'd{v};")
+        a(f"  localparam CfgTarget CFG_TGT_{k} = 3'd{v};")
     a('')
     a('  // ---- flag indices (Events.md)')
     for k, v in isa.y['flags'].items():

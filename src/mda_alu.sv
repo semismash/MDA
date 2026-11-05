@@ -13,7 +13,7 @@ module mda_alu #(
     input  logic use_imm,       // use imm instead of rs2
     input  Word  imm,           // immediate from decoder (imm gen)
     // other
-    input  logic fwd_imm,       // forward result to imm directly, alu bypass is emulated using decoder logic directly so fwd_imm serves as substituion for it
+    input  logic fwd_imm,       // forward result to imm directly
     // OUTPUTS:
     output Word  result,        // ALU result
     output logic alu_zero,      // goes to zero flag (if ALU result is zero)
@@ -42,12 +42,12 @@ module mda_alu #(
     always_comb begin
         result = '0;
         alu_carry = 1'b0;
-        alu_carry_upd = 1'b1;
+        alu_carry_upd = 1'b0;
         if (fwd_imm) begin
             result = imm;
         end else begin
             case (alu_op)
-                ALU_ADD:  {alu_carry, result} = data_1 + data_2;
+                ALU_ADD:  begin {alu_carry, result} = data_1 + data_2; alu_carry_upd = 1'b1; end
                 ALU_XOR:  result = data_1 ^ data_2;
                 ALU_AND:  result = data_1 & data_2;
                 ALU_OR:   result = data_1 | data_2;

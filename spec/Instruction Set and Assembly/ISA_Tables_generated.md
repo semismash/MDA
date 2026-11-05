@@ -1,4 +1,4 @@
-<!-- GENERATED from isa.yaml (sha256 a2def3e3217f9752) by isa_gen.py. Do not edit by hand. -->
+<!-- GENERATED from isa.yaml (sha256 240019e31d906bef) by isa_gen.py. Do not edit by hand. -->
 # MDA instruction encoding tables (generated)
 
 Bit ranges are instruction-word bits. A field with several ranges is their concatenation, MSB first.
@@ -11,10 +11,10 @@ Registers: rd [15:13], rs1 [12:10], rs2 [9:7], wb [6].
 |---|---|---|---|---|---|---|
 | `add` | `000` | A | - | - | Z,N,C |  |
 | `xor` | `001` | A | - | - | Z,N |  |
-| `shl` | `010` | A | - | - | Z,N,C | rs2 is the shift amount (low 5 bits). A shift by 0 leaves C unchanged |
-| `shr` | `011` | A | - | - | Z,N,C | logical shift right. A shift by 0 leaves C unchanged |
-| `cmp` | `100` | A | - | - | Z,N | unsigned. rd = 1 if rs1 < rs2. N = less, Z = equal, otherwise both 0 |
-| `cmpa` | `101` | A | - | - | Z,N | signed compare, same flag rules as cmp |
+| `shl` | `010` | A | - | - | Z,N,C | logical shift left by n = rs2[4:0]. For n = 1 to 31, C = rs1[32-n] (the last bit shifted out through the MSB). A shift by 0 leaves C unchanged, Z and N still follow the result |
+| `shr` | `011` | A | - | - | Z,N,C | logical shift right by n = rs2[4:0]. For n = 1 to 31, C = rs1[n-1] (the last bit shifted out through the LSB). A shift by 0 leaves C unchanged, Z and N still follow the result |
+| `cmp` | `100` | A | - | - | Z,N | unsigned three-way compare: rd = 1 if rs1 > rs2, -1 (0xFFFFFFFF) if rs1 < rs2, 0 if equal. Z and N follow from the result like any other ALU operation (N = less, Z = equal, both 0 if greater) |
+| `cmpa` | `101` | A | - | - | Z,N | signed three-way compare, same result and flag rules as cmp |
 | `and` | `110` | A | - | - | Z,N |  |
 | `or` | `111` | A | - | - | Z,N |  |
 
@@ -34,14 +34,14 @@ Registers: no registers. Unused funct codes (illegal): 5.
 
 ## RI-A (opcode `010`, funct [4:3])
 
-Registers: rd [15:13], rs1 [12:10], wb [5].
+Registers: rd [15:13], rs1 [12:10], wb [6].
 
 | Instruction | Funct | Stage | Fields | Reserved (must be 0) | Flags set | Notes |
 |---|---|---|---|---|---|---|
-| `addi` | `00` | A | `imm` [9:6] signed (-8 to 7) | - | Z,N,C |  |
-| `xori` | `01` | A | `imm` [9:6] signed (-8 to 7) | - | Z,N | imm = -1 is a NOT |
-| `shli` | `10` | A | `imm` [9:6] unsigned (0 to 15) | - | Z,N,C |  |
-| `shri` | `11` | A | `imm` [9:6] unsigned (0 to 15) | - | Z,N,C |  |
+| `addi` | `00` | A | `imm` [9:7,5] signed (-8 to 7) | - | Z,N,C |  |
+| `xori` | `01` | A | `imm` [9:7,5] signed (-8 to 7) | - | Z,N | imm = -1 is a NOT |
+| `shli` | `10` | A | `imm` [9:7,5] unsigned (0 to 15) | - | Z,N,C | logical shift left by n = imm (0 to 15). For n = 1 to 15, C = rs1[32-n] (the last bit shifted out through the MSB). A shift by 0 leaves C unchanged, Z and N still follow the result |
+| `shri` | `11` | A | `imm` [9:7,5] unsigned (0 to 15) | - | Z,N,C | logical shift right by n = imm (0 to 15). For n = 1 to 15, C = rs1[n-1] (the last bit shifted out through the LSB). A shift by 0 leaves C unchanged, Z and N still follow the result |
 
 ## RI-Z (opcode `011`, funct [4:3])
 
@@ -95,4 +95,3 @@ Registers: rd [15:13]. Unused funct codes (illegal): 2.
 | `jmp` | `00` | A | `offset` [12:5] signed (-128 to 127) | - | - | target = PC + 1 + off, rd = PC + 1 |
 | `pull` | `01` | B | `shift` [9:5] unsigned (0 to 31) | [12:10] | - |  |
 | `rpin` | `11` | B | `pin` [12:8] unsigned (0 to 31); `mode` [7:5] unsigned (0 to 7) | - | - | pin number above 23 is a runtime fault (bad pin access), not an illegal word. For the two pending modes the pin field is ignored Illegal values: mode=[5, 6, 7]. |
-

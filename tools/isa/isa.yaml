@@ -6,6 +6,7 @@
 #
 # NOTE: YAML 1.1 reads bare y/n/yes/no/on/off as booleans, so those words are never used as bare names here (flag N is quoted, the
 # jump field is called `offset`).
+# NOTE: RI-A has WB at bit 6 (as in RR), so its 4-bit immediate is split: imm[3:1] = instr[9:7], imm[0] = instr[5].
 # Bit ranges are written "hi:lo" (or "n" for one bit) in INSTRUCTION-WORD bit numbering (bit 15 = MSB).
 # A field with several ranges is the CONCATENATION of those ranges, MSB first (e.g. ["14:13", "9:6"] is a 6-bit value whose
 # top 2 bits are word bits 14:13 and whose low 4 bits are word bits 9:6).
@@ -23,7 +24,7 @@ isa:
 types:
   RR:   {opcode: 0, funct: "5:3", rd: "15:13", rs1: "12:10", rs2: "9:7", wb: "6", unused_funct: []}
   NX:   {opcode: 1, funct: "5:3", unused_funct: [5]}
-  RI-A: {opcode: 2, funct: "4:3", rd: "15:13", rs1: "12:10", wb: "5", unused_funct: []}
+  RI-A: {opcode: 2, funct: "4:3", rd: "15:13", rs1: "12:10", wb: "6", unused_funct: []}
   RI-Z: {opcode: 3, funct: "4:3", rd: "15:13", rs1: "12:10", unused_funct: [3]}
   SX:   {opcode: 4, funct: "4:3", rs1: "12:10", rs2: "9:7", unused_funct: [2, 3]}
   RX:   {opcode: 5, funct: "5:3", rs1: "12:10", unused_funct: [5]}
@@ -86,7 +87,7 @@ instructions:
     b_src: imm
     flags: [Z, "N", C]
     c_rule: carry
-    fields: {imm: {bits: ["9:6"], signed: true}}
+    fields: {imm: {bits: ["9:7", "5"], signed: true}}
   - name: xori
     mnemonic: xori
     type: RI-A
@@ -99,7 +100,7 @@ instructions:
     alu: xor
     b_src: imm
     flags: [Z, "N"]
-    fields: {imm: {bits: ["9:6"], signed: true}}
+    fields: {imm: {bits: ["9:7", "5"], signed: true}}
     note: "imm = -1 is a NOT"
   - name: shli
     mnemonic: shli
@@ -114,7 +115,7 @@ instructions:
     b_src: imm
     flags: [Z, "N", C]
     c_rule: shift_out
-    fields: {imm: {bits: ["9:6"]}}
+    fields: {imm: {bits: ["9:7", "5"]}}
     note: "logical shift left by n = imm (0 to 15). For n = 1 to 15, C = rs1[32-n] (the last bit shifted out through the MSB). A shift by 0 leaves C unchanged, Z and N still follow the result"
   - name: shri
     mnemonic: shri
@@ -129,7 +130,7 @@ instructions:
     b_src: imm
     flags: [Z, "N", C]
     c_rule: shift_out
-    fields: {imm: {bits: ["9:6"]}}
+    fields: {imm: {bits: ["9:7", "5"]}}
     note: "logical shift right by n = imm (0 to 15). For n = 1 to 15, C = rs1[n-1] (the last bit shifted out through the LSB). A shift by 0 leaves C unchanged, Z and N still follow the result"
 
   # ------------------------------------------------------------------ RI-Z (opcode 011), rd always written, no flags
@@ -418,8 +419,8 @@ suffix:
 # so they are the check that this file says what the doc says. Operands use this file's field names.
 examples:
   - {asm: "add r0, r5, r6",                       name: add,     ops: {rd: 0, rs1: 5, rs2: 6, wb: 1},       word: 0x1740}
-  - {asm: "xori @na, r7, -1",                     name: xori,    ops: {rd: 0, rs1: 7, imm: -1, wb: 0},      word: 0x1FCA}
-  - {asm: "addi r1, r2, -4",                      name: addi,    ops: {rd: 1, rs1: 2, imm: -4, wb: 1},      word: 0x2B22}
+  - {asm: "xori @na, r7, -1",                     name: xori,    ops: {rd: 0, rs1: 7, imm: -1, wb: 0},      word: 0x1FAA}
+  - {asm: "addi r1, r2, -4",                      name: addi,    ops: {rd: 1, rs1: 2, imm: -4, wb: 1},      word: 0x2B42}
   - {asm: "lw r3, 3(r2)",                         name: lw,      ops: {rd: 3, rs1: 2, offset: 3},              word: 0x686B}
   - {asm: "jrg r1, r1, 0",                        name: jrg,     ops: {rd: 1, rs1: 1, imm: 0},              word: 0x2413}
   - {asm: "lbi r1, 200",                          name: lbi,     ops: {rd: 1, imm: 200},                    word: 0x390E}
