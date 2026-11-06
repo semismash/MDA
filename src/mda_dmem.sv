@@ -1,10 +1,10 @@
 import mda_pkg::*;
 
-// data memory wrapper
+// Data memory wrapper.
 //   - core side: loads and stores, at most one access per cycle (only one thread is in EX)
 //   - loader side: word writes while the threads are held (priority over the core port)
 //   - single port: load data appears the cycle after the address
-//   - stores use a per-bit write mask (1 = write), so byte stores are done by the caller with a mask
+//   - stores use a 4-bit byte strobe (bit n writes byte lane n), so the LSU does byte stores with a one-hot strobe. The per-bit mask of the memory macro is built inside this module
 // Selection of the memory implementation:
 //   MDA_SRAM_MACRO defined: the IHP 256x32 macro (ASIC build)
 //   otherwise:              sram_sim, a behavioral RAM (simulation and FPGA)
@@ -20,7 +20,7 @@ module mda_dmem #(
     input  logic        core_we,        // 1: store, 0: load
     input  DmemWordAddr core_addr,      // word index
     input  Word         core_wdata,     // store data, already aligned to its byte lane
-    input  Word         core_wmask,     // per-bit write mask, 1 = write
+    input  logic [3:0]  core_wstrb,     // byte strobe, bit n = write byte lane n
     // loader port
     input  logic        ld_we,          // write enable, priority over the core port
     input  DmemWordAddr ld_addr,        // word index
@@ -32,13 +32,15 @@ module mda_dmem #(
     logic         mem_en, mem_we, mem_re;
     DmemWordAddr  mem_addr;
     Word          mem_wdata, mem_wmask;
+    Word          strobe_mask;
+    assign strobe_mask = {{8{core_wstrb[3]}}, {8{core_wstrb[2]}}, {8{core_wstrb[1]}}, {8{core_wstrb[0]}}};
 
     assign mem_en    = core_en | ld_we;
     assign mem_we    = ld_we | (core_en & core_we);
     assign mem_re    = core_en & ~core_we & ~ld_we;
     assign mem_addr  = ld_we ? ld_addr  : core_addr;
     assign mem_wdata = ld_we ? ld_wdata : core_wdata;
-    assign mem_wmask = ld_we ? {DATA_WIDTH{1'b1}} : core_wmask;
+    assign mem_wmask = ld_we ? {DATA_WIDTH{1'b1}} : strobe_mask;
 
 `ifdef MDA_SRAM_MACRO
     RM_IHPSG13_1P_256x32_c2_bm_bist u_sram (

@@ -58,8 +58,9 @@ Z, N, C live per thread in `mda_flags`. Instructions that set flags: `add xor an
 The LSU produces `fault` and `fault_cause` (misaligned `000`, out of bounds `001`) and the decoder produces `illegal` (`110`). The faulting store is suppressed (`A_MEN` low), the faulting load returns 0, and illegal instructions execute as no-ops. Stage A only **exposes** the faults on the trace port. The `ERR` flag and cause latching arrive with `mda_events` in Stage B. Timing is never affected, as the spec requires.
 
 ### D7. Memory access details.
+- Loads and stores use the ALU as the address adder: the decoder sets `alu_op = ALU_ADD`, `use_imm = 1`, `fwd_imm = 0` and no flag update, and the LSU takes the ALU result as `addr`. This saves a 32-bit adder. The EX path is ID/EX registers, ALU add, bounds and alignment check, DMEM macro setup, and is estimated well inside the cycle.
 - Word index = `addr[DMEM_ADDR_WIDTH+1:2]`. Out of bounds if `addr[31:DMEM_ADDR_WIDTH+2] != 0`. Misaligned if `lw`/`sw` and `addr[1:0] != 0`.
-- Byte store: `A_BM = 32'hFF << (8*addr[1:0])`, `A_DIN = {4{byte}}`. Word store: all-ones mask.
+- Byte store: `dm_wstrb = 4'b0001 << addr[1:0]` and `dm_wdata = {4{rs2[7:0]}}`. Word store: `dm_wstrb = 4'b1111`. `mda_dmem` expands the strobe to the per-bit mask that the macro takes.
 - Byte load: the lane is selected from the registered `addr[1:0]` of the load.
 - IMEM macro: `A_MEN = 1`, `A_REN = 1` every cycle while running, `A_BM = 16'hFFFF`, `A_DLY = 1`, `A_BIST_* = 0`.
 - Cross-thread visibility: a store at EX in cycle k is visible to any load whose address is issued from cycle k+1 onward, which is the soonest another thread can issue one.
@@ -82,8 +83,8 @@ Do not use `ifdef` for this: synthesis removes the unused logic anyway, and the 
 |---|---|---|---|
 | `run` | `mda_core` | Yes, low | Nothing executes until `go` |
 | Scheduler ring position | `mda_sched` | Yes, thread 0 in IF | All threads start in a known slot |
-| `id_v`, `ex_v` | `mda_sched` | Yes, low | No instruction is in ID or EX after reset |
-| `valid` | `mda_id_ex` | Yes, low | A stale valid bit would execute garbage |
+| `id_v` | `mda_sched` | Yes, low | No instruction is in ID after reset |
+| `ex_v` | `mda_id_ex` | Yes, low | A stale valid bit would execute garbage |
 | `ld_valid` | `mda_lsu` | Yes, low | A stale load return would write a register bank |
 | `suffix_pend` (per thread) | `mda_suffix` | Yes, low | A stale flag would decode the first word as an `lli` suffix |
 | Captured `rd` and `imm8` of a pending `lli` | `mda_suffix` | No | Payload, qualified by `suffix_pend` |
@@ -105,11 +106,11 @@ Stage B adds the following reset state, matching the start state in `Threading.m
 
 ## 2. Updated Stage A file list
 
-Compared with the earlier file tree: `mda_if_id` removed (D2), `mda_pc` merged into `mda_fetch` (a standalone PC module would be a thin wrapper), `mda_ex` removed (pure wiring, `mda_core` instantiates its children directly), and `mda_spatial` moved to Stage B. That makes **23 `src/` files plus the 2 macro stubs for Stage A** (`mda_suffix` and `mda_imm_gen` were split out of the decoder):
+Compared with the earlier file tree: `mda_if_id` removed (D2), `mda_pc` merged into `mda_fetch` (a standalone PC module would be a thin wrapper), `mda_ex` removed (pure wiring, `mda_core` instantiates its children directly), and `mda_spatial` moved to Stage B. That makes **22 `src/` files plus the 2 macro stubs for Stage A** (`mda_suffix` and `mda_imm_gen` were split out of the decoder, and `mda_shifter` was dropped because the shifts live in `mda_alu`):
 
 ```
 mda_pkg  mda_isa_pkg  mda_tt_top  mda_top  mda_core  mda_sched  mda_fetch  mda_id_ex  mda_decoder  mda_suffix  mda_imm_gen
-mda_regfile  mda_alu  mda_shifter  mda_branch_unit  mda_cond  mda_flags  mda_lsu  mda_wb
+mda_regfile  mda_alu  mda_branch_unit  mda_cond  mda_flags  mda_lsu  mda_wb
 mda_imem  mda_dmem  mda_sram_sim  mda_sync
 RM_IHPSG13_1P_1024x16_c2_bm_bist.v   RM_IHPSG13_1P_256x32_c2_bm_bist.v
 ```
@@ -128,20 +129,25 @@ Stage B then adds 17: `mda_spatial mda_cfg_unit mda_events mda_doorbell mda_slee
 | Stage B names | `WATCH_*`, `OSRC_*`, `OWN_*`, `PINCFG_*`, `ENGCTL_*`, `LDR_*`, pin grouping | Fixed in advance, unused in Stage A |
 | Build variants | `SAMPLE_COMP_DEFAULT`, `PIN_INVERT_DEFAULT`, `ENG_GAPLESS_DEFAULT` | Default 0. Top-level modules expose them as parameters |
 
-`FLAG_*` and `CAUSE_*` are not defined in `mda_pkg`. `mda_isa_pkg` holds opcode and funct constants, reserved-field masks, flag indices and fault causes, generated from `tools/isa/isa.yaml` and marked do-not-edit. `tools/isa/check_names.py` verifies that the two packages share no identifier and that the ALU codes match the funct codes.
+`FLAG_*` and `CAUSE_*` are not defined in `mda_pkg`. `mda_isa_pkg` holds opcode and funct constants (typed with `OpCode`, `Funct3` and `Funct2`, plus `RpinMode` and `CfgTarget`), reserved-field masks, flag indices and fault causes, generated from `tools/isa/isa.yaml` and marked do-not-edit. `tools/isa/check_names.py` verifies that the two packages share no identifier and that the ALU codes match the funct codes.
 
 ## 4. Port lists
 
 All modules have `clk` (and `rst_n` where there is reset state). A one-hot vector is written `t[2:0]`. Control signals cross module boundaries as individual vectors, not packed structs (support for structs on ports in the flow's Yosys has not been verified).
 
 ### `mda_sched`
-| Port | Dir | Width | Description |
-|---|---|---|---|
-| `run` | in | 1 | Hold the ring until threads are released |
-| `if_t`, `id_t`, `ex_t` | out | 3 each | One-hot thread in each stage |
-| `id_v`, `ex_v` | out | 1 each | Stage holds a real instruction (low for the first cycles after `run` rises) |
+Three-flop one-hot ring plus a valid flop. Nothing else.
 
-A 3-bit one-hot ring, nothing else. Keep it small so formal can prove "exactly one thread per stage, every stage rotates every cycle".
+| Port | Dir | Type | Description |
+|---|---|---|---|
+| `clk`, `rst_n` | in | 1 | Clock and reset |
+| `run` | in | 1 | Threads released. While low the ring holds at its reset state (thread 0 in IF) |
+| `if_t` | out | `ThreadSel` | One-hot thread in IF. Rotates thread 0, 1, 2 every cycle while `run` is high |
+| `id_t` | out | `ThreadSel` | One-hot thread in ID. Wiring of `if_t`: `{if_t[0], if_t[2], if_t[1]}` |
+| `ex_t` | out | `ThreadSel` | One-hot thread in EX. Wiring of `if_t`: `{if_t[1], if_t[0], if_t[2]}` |
+| `id_v` | out | 1 | The ID stage holds a real instruction. `run` delayed by one cycle, reset low |
+
+`ex_v` is held by `mda_id_ex`. Properties for the formal check: each of the three vectors is one-hot in every cycle, the three vectors name three different threads, and the ring advances every cycle while `run` is high.
 
 ### `mda_fetch` (contains the three PCs)
 | Port | Dir | Width | Description |
@@ -170,7 +176,16 @@ The ports of these three blocks, the immediate formats, the decoding rules and t
 No reset on the registers (the spec leaves them uninitialized), so the module has no `rst_n` port (D10). Add an assertion that `ex_t` and `if_t` banks never write in the same cycle with the same bank (they cannot, by D1).
 
 ### `mda_id_ex`
-Registers the decoder outputs and operands at the end of ID. Inputs are the decoder outputs plus `opa` (rs1 value), `opb` (`b_imm ? imm : rs2 value`), `sdata` (rs2 value, for stores), and `instr` (for the trace only). Outputs are the same signals, registered, and a `valid` bit.
+ID/EX pipeline register. Inputs carry the prefix `id_`, outputs the prefix `ex_`, and the names follow the decoder outputs.
+
+| Group | Signals |
+|---|---|
+| Valid | `id_v` in, `ex_v` out. The only reset state. `ex_v` follows `id_v` one cycle later |
+| Raw word | `instr` (16). For the trace, the `jof` flag number, the `joc` invert bit and the Stage B fields |
+| Operands | `rs1_data`, `rs2_data` (store data), `imm` (32 each) |
+| Decoder outputs | `rd_addr`, `reg_write`, `alu_op`, `use_imm`, `fwd_imm`, `res_sel`, `f_u_alu`, `illegal`, `br_type`, `br_jof_inv`, `br_joc_all`, `mem_op`, `mem_byte`, `sp_valid`, `sp_op` |
+
+Not registered: `rs1_addr`, `rs2_addr` and `lli_first`, which are consumed in ID. About 138 payload flops plus `ex_v`. The payload is not reset (D10), so every consumer qualifies it with `ex_v`.
 
 ### `mda_alu`
 | Port | Dir | Width | Description |
@@ -183,39 +198,91 @@ Registers the decoder outputs and operands at the end of ID. Inputs are the deco
 
 For `cmp` and `cmpa`, `y` is the three-way result: bits `[31:1]` are `lt` and bit 0 is `lt | ~eq`, so `y` is all ones when less, `0` when equal and `1` when greater. The flags then need no special case.
 
-`mda_shifter`: `a[31:0]`, `amt[4:0]`, `left` in; `y[31:0]`, `c_out` out. It is shared with `pull`/`push` in Stage B.
+There is no separate shifter module: the shifts are done inside `mda_alu` with a 33-bit shift that also yields the carry.
 
 ### `mda_cond`
-| Port | Dir | Width | Description |
-|---|---|---|---|
-| `flags` | in | 16 | Flag view of the thread in EX |
-| `mask` | in | 16 | One-hot for `jof`, register value for `joc` |
-| `all_mode`, `inv` | in | 1 each | The four conditions: all/any x set/clear |
-| `hit` | out | 1 | |
+Flag-mask condition, shared with `waitev` in Stage B. Combinational, with no knowledge of any instruction.
 
-Shared with `waitev` in Stage B, so give it no instruction-specific knowledge.
+| Port | Dir | Type | Description |
+|---|---|---|---|
+| `flags` | in | `Flags` | Flags of the thread in EX |
+| `mask` | in | `Flags` | One-hot flag select for `jof`, the register mask (`rs1_data[15:0]`) for `joc` |
+| `all_mode` | in | 1 | 1: all flags in the mask must be set. 0: any flag in the mask |
+| `inv` | in | 1 | Invert the result |
+| `hit` | out | 1 | `(all_mode ? ((flags & mask) == mask) : |(flags & mask)) ^ inv` |
+
+Test point: an empty mask with `all_mode` (vacuously true), and the four combinations with `inv`.
 
 ### `mda_branch_unit`
-Inputs: `br_type`, `br_off`, `jof_flag`, `br_inv`, `joc_all`, `opa`, `opb`, `ex_pc`, `flags`. Outputs: `taken`, `target` (IMEM_ADDR_WIDTH bits), `link` (= `ex_pc`).
+Turns the decoded jump kind into the controls of the PC adder in `mda_pc`. Combinational. It contains an instance of `mda_cond`.
+
+| Port | Dir | Type | Description |
+|---|---|---|---|
+| `ex_v` | in | 1 | The EX stage holds a real instruction. All outputs are inactive when low |
+| `br_type` | in | `BrType` | From `mda_id_ex` |
+| `br_jof_inv` | in | 1 | `jof` invert variant |
+| `br_joc_all` | in | 1 | `joc` all-of or any-of |
+| `instr` | in | `Instruction` | Raw EX word: the `jof` flag number is `instr[15:12]`, the `joc` invert bit is `instr[15]` |
+| `flags` | in | `Flags` | Flags of the thread in EX |
+| `rs1_data` | in | `Word` | `joc` flag mask in the low 16 bits |
+| `taken` | out | 1 | The jump is taken (for the trace and the PC controls) |
+| `pc_in1` | out | 1 | To `mda_pc`: 1 selects the PC as the base, 0 selects `rs1` |
+| `pc_in2` | out | 1 | To `mda_pc`: 1 selects +1, 0 selects the immediate |
+| `pc_cin` | out | 1 | To `mda_pc`: carry-in, high for taken PC-relative jumps |
+
+| Case | `pc_in1` | `pc_in2` | `pc_cin` |
+|---|---|---|---|
+| Sequential (no jump, or not taken) | 1 | 1 | 0 |
+| Taken `jmp`, `jnl`, `jof`, `joc` | 1 | 0 | 1 |
+| `jrg` (always taken, `rs1 + imm`) | 0 | 0 | 0 |
+
+`jmp`, `jnl` and `jrg` are always taken. `jof` uses `mask = 16'h1 << instr[15:12]`, `all_mode = 0`, `inv = br_jof_inv`. `joc` uses `mask = rs1_data[15:0]`, `all_mode = br_joc_all`, `inv = instr[15]`. The wrapper forms `pc_en = ex_v & ex_t[t]` for each thread's PC.
 
 ### `mda_flags`
 Inputs: `ex_t`, `ex_v`, `zn_we`, `z_in`, `n_in`, `c_we`, `c_in`. Output: `flags_ex[15:0]` (flags of the thread in EX). Z/N/C only in Stage A.
 
 ### `mda_lsu`
-| Port | Dir | Width | Description |
+Load/store unit. The effective address is the ALU result (`rs1 + imm`, with word offsets already scaled by the immediate generator), so the unit has no adder. The load-return registers live here.
+
+| Port | Dir | Type | Description |
 |---|---|---|---|
-| `ex_v`, `mem_op`, `mem_byte` | in | 1, 2, 1 | |
-| `base`, `off`, `sdata` | in | 32, 5, 32 | `off` scaled here by 4 for words |
-| `rd_idx` | in | 3 | Registered for the load return |
-| `dm_en`, `dm_we` | out | 1 each | To `mda_dmem` (low on a fault) |
-| `dm_addr` | out | DMEM_ADDR_WIDTH | |
-| `dm_din`, `dm_bm` | out | 32 each | |
-| `dm_dout` | in | 32 | Valid the cycle after a load |
-| `fault`, `fault_cause` | out | 1, 3 | |
-| `ld_valid`, `ld_rd`, `ld_data` | out | 1, 3, 32 | Load return for the thread now in IF (zero on a fault, lane-selected for bytes) |
+| `clk`, `rst_n` | in | 1 | Clock and reset |
+| `ex_v` | in | 1 | The EX stage holds a real instruction |
+| `mem_op` | in | `MemOp` | None, load, store |
+| `mem_byte` | in | 1 | Byte (1) or word (0) access |
+| `addr` | in | `Word` | Effective byte address (the ALU result) |
+| `store_data` | in | `Word` | `rs2` value |
+| `rd_addr` | in | `RegAddr` | Destination of a load |
+| `dm_rdata` | in | `Word` | Data memory read data, valid the cycle after a load is issued |
+| `dm_en` | out | 1 | To `mda_dmem.core_en`. Low on a fault |
+| `dm_we` | out | 1 | `core_we`: 1 for a store |
+| `dm_addr` | out | `DmemWordAddr` | Word index, `addr[DMEM_ADDR_WIDTH+1:2]` |
+| `dm_wdata` | out | `Word` | Word store: `store_data`. Byte store: the byte replicated into all four lanes |
+| `dm_wstrb` | out | 4 | Word store: `4'b1111`. Byte store: `4'b0001 << addr[1:0]` |
+| `fault` | out | 1 | A faulting access in EX |
+| `fault_cause` | out | `Cause` | `CAUSE_MISALIGNED` or `CAUSE_OUT_OF_BOUNDS` |
+| `ld_valid` | out | 1 | A load result is available (registered, reset low) |
+| `ld_rd` | out | `RegAddr` | Registered `rd_addr` of that load |
+| `ld_data` | out | `Word` | Aligned and zero-extended load data. 0 for a faulting load |
+
+Faults: misaligned is a word access with `addr[1:0] != 0`. Out of bounds is any of `addr[31:DMEM_BYTE_ADDR_WIDTH]` set. A faulting store is suppressed (`dm_en` low), and a faulting load still produces a result, which is 0. All outputs are qualified by `ex_v`. Registered at the end of EX: `ld_valid` (reset), and the payload `ld_rd`, the byte flag, `addr[1:0]` and the fault flag, which `ld_data` uses when the memory data arrives. Byte loads select lane `addr[1:0]` (little-endian) and zero-extend. The cause when both faults apply must be checked against `Events.md`.
 
 ### `mda_wb`
-Combines the EX result mux (ALU output or link) with the register write requests for both paths. Inputs: `ex_v`, `rd_we`, `rd_idx`, `res_sel`, `alu_y`, `link`, `ld_valid`, `ld_rd`, `ld_data`. Outputs: `w_ex_we/idx/data` and `w_ld_we/idx/data`, as seen by `mda_regfile`.
+Selects the EX result and forms the two register write requests. Combinational.
+
+| Port | Dir | Type | Description |
+|---|---|---|---|
+| `ex_v`, `reg_write`, `sp_valid` | in | 1 each | EX qualifier and decoder controls |
+| `rd_addr` | in | `RegAddr` | Destination register |
+| `res_sel` | in | `ResSel` | `RES_ALU`, `RES_LINK` or `RES_SP` |
+| `alu_result` | in | `Word` | ALU output or forwarded immediate |
+| `pc_plus1` | in | `PcAddr` | Link value, zero-extended to 32 bits |
+| `sp_result` | in | `Word` | Stage B result. Tie to 0 in Stage A |
+| `ld_valid`, `ld_rd`, `ld_data` | in | 1, `RegAddr`, `Word` | Load return from the LSU |
+| `w_ex_we`, `w_ex_addr`, `w_ex_data` | out | | EX write request, for the bank of the thread in EX |
+| `w_ld_we`, `w_ld_addr`, `w_ld_data` | out | | Load-return write request, for the bank of the thread in IF. A pass-through of the load return |
+
+Parameter `HAS_STAGE_B` (default 0): when 0, the EX write is masked for Stage B instructions (`pull`, `rpin`), which execute as no-ops in Stage A. `w_ex_we = ex_v & reg_write & (HAS_STAGE_B | ~sp_valid)`.
 
 ### `mda_imem`
 | Port | Dir | Width | Description |
@@ -229,10 +296,11 @@ With `` `ifdef MDA_SRAM_MACRO `` it instantiates `RM_IHPSG13_1P_1024x16_c2_bm_bi
 ### `mda_dmem`
 | Port | Dir | Width | Description |
 |---|---|---|---|
-| `c_en`, `c_we`, `c_addr` | in | 1, 1, DMEM_ADDR_WIDTH | Core port |
-| `c_din`, `c_bm` | in | 32 each | Data and per-bit write mask (`1` = write) |
-| `c_dout` | out | 32 | Valid the cycle after a read |
-| `l_we`, `l_addr`, `l_din` | in | 1, DMEM_ADDR_WIDTH, 32 | Loader write port, full word |
+| `core_en`, `core_we`, `core_addr` | in | 1, 1, DMEM_ADDR_WIDTH | Core port, from the LSU |
+| `core_wdata` | in | 32 | Store data, already placed in its byte lane(s) |
+| `core_wstrb` | in | 4 | Byte strobe, bit n writes byte lane n. Expanded inside to the per-bit mask of the macro |
+| `core_rdata` | out | 32 | Valid the cycle after a read |
+| `ld_we`, `ld_addr`, `ld_wdata` | in | 1, DMEM_ADDR_WIDTH, 32 | Loader write port, full word, priority over the core |
 
 Same macro-or-simulation arrangement, with `RM_IHPSG13_1P_256x32_c2_bm_bist`.
 
@@ -240,7 +308,13 @@ Same macro-or-simulation arrangement, with `RM_IHPSG13_1P_256x32_c2_bm_bist`.
 Parameters `AW`, `DW`. One port, synchronous read with a registered output, per-bit write mask (1 writes), write-through if both enables are set. It must behave like the macro in the cases the tests use, and nothing more.
 
 ### `mda_sync`
-Parameter `W`. `d[W-1:0]` in, `q[W-1:0]` out, 2-flop synchronizer. Instantiated for reset in `mda_tt_top`, and for pins in Stage B.
+| Port | Dir | Width | Description |
+|---|---|---|---|
+| `clk` | in | 1 | |
+| `d` | in | `WIDTH` | Asynchronous input |
+| `q` | out | `WIDTH` | `d` synchronized by two flops. No reset |
+
+Parameter `WIDTH`. Used for the reset input in `mda_tt_top` (both edges synchronized, so assertion takes up to two cycles) and for the Stage B pin inputs.
 
 ### `mda_core`
 Ports: `clk`, `rst_n`, `go`, `entry_pc[3*IMEM_ADDR_WIDTH]`, the IMEM interface (`imem_addr`, `imem_data`, `imem_en`), the DMEM interface (the `dm_*` signals above), and the trace port (D9). It instantiates `mda_sched`, `mda_fetch`, `mda_decoder`, `mda_suffix` (selected with `id_t`), `mda_imm_gen`, `mda_regfile`, `mda_id_ex`, `mda_alu`, `mda_branch_unit`, `mda_flags`, `mda_lsu` and `mda_wb`.
@@ -270,5 +344,5 @@ The `tt_um_<yourname>_mda` wrapper: Tiny Tapeout pin mapping, reset synchronizer
 ## 7. Next steps
 
 1. `isa.yaml`, the generated `mda_isa_pkg` and the golden encoding vectors: done (`tools/isa/`).
-2. In order: `mda_pkg`, `mda_sync`, `mda_sched`, `mda_regfile`, `mda_alu` + `mda_shifter`, `mda_decoder`, then the rest of the pipeline. Test each leaf module with its own small bench before integration.
+2. In order: `mda_pkg`, `mda_sync`, `mda_sched`, `mda_regfile`, `mda_alu`, `mda_decoder`, then the rest of the pipeline. Test each leaf module with its own small bench before integration.
 3. A first hardening run of the Stage A core with both macros.
