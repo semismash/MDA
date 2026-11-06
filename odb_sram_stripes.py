@@ -1,6 +1,6 @@
-# ADAPTED for the MDA SRAM dry run (macro retargeted to 1024x16).
+# ADAPTED for MDA: handles every IHP SRAM master in the design (1024x16 and 256x32), each with its own LEF.
 # Upstream: github.com/kdp1965/protocol-emulator (cmos5l). Check its LICENSE before publishing.
-# Needs the PDK LEF copied to macro/<MACRO_NAME>/<MACRO_NAME>.lef (see LEF_PATH below).
+# Needs the PDK LEF of every SRAM master copied to macro/<MASTER>/<MASTER>.lef (see lef_path below).
 # Only R0 or MX macro orientations are supported by this script.
 #
 # Rewrite the tile Metal4 PDN over the IHP SRAM so its rails become the PDN.
@@ -33,9 +33,12 @@ SRAM_PINS = {
 
 # IHP SRAM Metal4 supply pitch between adjacent opposite-polarity columns.
 PAIR_PITCH_UM = 5.62
-MACRO_NAME = "RM_IHPSG13_1P_1024x16_c2_bm_bist"
 HERE = os.path.dirname(os.path.abspath(__file__))
-LEF_PATH = os.path.join(HERE, "macro", MACRO_NAME, f"{MACRO_NAME}.lef")
+
+
+def lef_path(master_name):
+    """The PDK LEF of an SRAM master, copied into the repository."""
+    return os.path.join(HERE, "macro", master_name, f"{master_name}.lef")
 
 
 def is_sram(master):
@@ -45,18 +48,24 @@ def is_sram(master):
     )
 
 
-def lef_tall_metal4_obs():
-    """Master-frame (x0, x1) for tall Metal4 OBS rects, from the LEF text.
+_OBS_CACHE = {}
+
+
+def lef_tall_metal4_obs(master_name):
+    """Master-frame (x0, x1) for tall Metal4 OBS rects of one SRAM master, from its LEF text.
 
     Parsing the LEF avoids depending on odb's getObstructions() polygon
     decomposition across LibreLane / OpenROAD versions.
     """
-    if not os.path.isfile(LEF_PATH):
-        raise click.ClickException(f"SRAM LEF not found: {LEF_PATH}")
-    text = open(LEF_PATH, encoding="utf-8", errors="replace").read()
+    if master_name in _OBS_CACHE:
+        return _OBS_CACHE[master_name]
+    path = lef_path(master_name)
+    if not os.path.isfile(path):
+        raise click.ClickException(f"SRAM LEF not found for {master_name}: {path}")
+    text = open(path, encoding="utf-8", errors="replace").read()
     match = re.search(r"LAYER Metal4 SPACING.*?(?=\n\s*END)", text, re.S)
     if match is None:
-        raise click.ClickException(f"{LEF_PATH}: no Metal4 OBS block")
+        raise click.ClickException(f"{path}: no Metal4 OBS block")
     tall = []
     for r in re.findall(
         r"RECT\s+([\d.]+)\s+([\d.]+)\s+([\d.]+)\s+([\d.]+)", match.group(0)
@@ -64,7 +73,8 @@ def lef_tall_metal4_obs():
         x0, y0, x1, y1 = map(float, r)
         if y1 - y0 > 50.0:
             tall.append((x0, x1))
-    return sorted(set(tall))
+    _OBS_CACHE[master_name] = sorted(set(tall))
+    return _OBS_CACHE[master_name]
 
 
 @click.command()
@@ -190,7 +200,7 @@ def extend(reader, layer, min_pairs):
         """Die-frame (x0, x1) for each Metal4 OBS gap that looks like a pin
         corridor (~pin width), plus the declared PIN boxes themselves."""
         ox = inst.getBBox().xMin()
-        obs = lef_tall_metal4_obs()  # master um
+        obs = lef_tall_metal4_obs(inst.getMaster().getName())  # master um
         # Declared pin width (fallback 2.81 um) for synthetic corridors.
         pin_w_um = 2.81
         for nn_pins in declared_pins(inst).values():

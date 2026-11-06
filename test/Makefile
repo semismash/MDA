@@ -32,9 +32,11 @@ PROJECT_SOURCES = mda_pkg.sv \
     mda_core.sv \
     mda_top.sv \
     mda_tt_top.sv
-# Stand-in simulation model of the SRAM macro (the stub in src/ is an empty blackbox).
-# TODO: switch to the foundry behavioural model from the PDK once its path is confirmed.
-MACRO_MODEL = $(PWD)/RM_IHPSG13_1P_1024x16_c2_bm_bist_model.v
+# Stand-in simulation models of the two SRAM macros (the stubs in src/ are empty blackboxes).
+# Only the gate-level run uses them, the RTL run uses the simulation RAM (mda_sram_sim).
+# TODO: switch to the foundry behavioural models from the PDK once their path is confirmed.
+MACRO_MODEL = $(PWD)/RM_IHPSG13_1P_1024x16_c2_bm_bist_model.v \
+              $(PWD)/RM_IHPSG13_1P_256x32_c2_bm_bist_model.v
 
 ifneq ($(GATES),yes)
 
@@ -59,6 +61,9 @@ VERILOG_SOURCES += $(PWD)/gate_level_netlist.v
 VERILOG_SOURCES += $(MACRO_MODEL)
 
 endif
+
+# The design is SystemVerilog
+COMPILE_ARGS 		+= -g2012
 
 # Allow sharing configuration between design and testbench via `include`:
 COMPILE_ARGS 		+= -I$(SRC_DIR)

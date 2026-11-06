@@ -4,14 +4,14 @@ project:
   author:       "Auritro Nath"      # Your name
   discord:      "semismash"      # Your discord username, for communication and automatically assigning you a Tapeout role (optional)
   description:  "Entry for Jane Street Protocol Emulator Challenge 2026"      # One line description of what your project does
-  language:     "Verilog" # other examples include SystemVerilog, Amaranth, VHDL, etc
+  language:     "SystemVerilog" # other examples include SystemVerilog, Amaranth, VHDL, etc
   clock_hz:     50000000       # Clock frequency in Hz (or 0 if not applicable)
 
   # How many tiles your design occupies? A single tile is about 167x108 uM.
   tiles: "6x4"          # Valid values: 1x1, 1x2, 2x2, 3x2, 4x2, 6x2 or 8x2
  
   # Your top module name must start with "tt_um_". Make it unique by including your github username:
-  top_module:  "tt_um_mda_sram_dryrun"
+  top_module:  "tt_um_mda"
  
   # List your project's source files here.
   # Source files must be in ./src and you must list each source file separately, one per line.
@@ -60,14 +60,14 @@ pinout:
   ui[7]: "unused"
  
   # Outputs
-  uo[0]: "done"
-  uo[1]: "pass"
-  uo[2]: "fail"
-  uo[3]: "unused"
-  uo[4]: "dout0"
-  uo[5]: "dout1"
-  uo[6]: "dout2"
-  uo[7]: "dout3"
+  uo[0]: "trace_hash0"
+  uo[1]: "trace_hash1"
+  uo[2]: "trace_hash2"
+  uo[3]: "trace_hash3"
+  uo[4]: "trace_hash4"
+  uo[5]: "trace_hash5"
+  uo[6]: "trace_hash6"
+  uo[7]: "trace_hash7"
  
   # Bidirectional pins
   uio[0]: "unused"
