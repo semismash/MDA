@@ -1,13 +1,13 @@
 import mda_pkg::*;
 
-// ID/EX pipeline register
-// please note that only nly ex_v is reset; the payload is not, v just indicdates if its valid or NOP
+// ID/EX pipeline register. Only ex_v is reset; the payload is not (it is qualified by ex_v downstream).
 module mda_id_ex (
     // clock and reset
     input  logic        clk,
     input  logic        rst_n,
     // INPUTS (ID stage):
     input  logic        id_v,           // the ID stage holds a real instruction
+    input  Thread       id_thread,
     input  Instruction  id_instr,       // raw instruction word (trace, Stage B fields, jof flag, joc invert)
     // operands
     input  Word         id_rs1_data,    // register read port 1
@@ -31,6 +31,7 @@ module mda_id_ex (
     input  SpOp         id_sp_op,
     // OUTPUTS (EX stage):
     output logic        ex_v,           // the EX stage holds a real instruction
+    output Thread       ex_thread,
     output Instruction  ex_instr,
     output Word         ex_rs1_data,
     output Word         ex_rs2_data,
@@ -60,6 +61,7 @@ module mda_id_ex (
 
     // payload, not reset
     always_ff @(posedge clk) begin
+        ex_thread     <= id_thread;
         ex_instr      <= id_instr;
         ex_rs1_data   <= id_rs1_data;
         ex_rs2_data   <= id_rs2_data;

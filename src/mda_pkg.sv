@@ -72,6 +72,10 @@ package mda_pkg;
     typedef logic [FLAGS_WIDTH-1:0]     Flags;          // flag view of one thread
     typedef logic [DMEM_ADDR_WIDTH-1:0] DmemWordAddr;   // data memory word index
     typedef logic [2:0]                 Cause;          // fault cause code (CAUSE_* in mda_isa_pkg)
+    typedef logic [1:0]                 Thread;
+    localparam Thread THREAD_0 = 2'd0;
+    localparam Thread THREAD_1 = 2'd1;
+    localparam Thread THREAD_2 = 2'd2;
 
     localparam Instruction NOP_INSTR     = 16'h0011;    // jnl 0, the canonical no-operation
     localparam Instruction ILLEGAL_INSTR = 16'hFFFF;    // reserved rpin encoding, used as a fill value

@@ -8,6 +8,7 @@ module mda_wb #(
     // INPUTS:
     // EX stage
     input  logic    ex_v,           // the EX stage holds a real instruction
+    input  Thread   ex_thread,
     input  logic    reg_write,      // decoder write enable
     input  logic    sp_valid,       // decoder: Stage B instruction
     input  RegAddr  rd_addr,        // destination register
@@ -18,15 +19,18 @@ module mda_wb #(
     // load return (from the LSU)
     input  logic    ld_valid,       // a load result is available
     input  RegAddr  ld_rd,          // load destination register
+    input  Thread   ld_thread,
     input  Word     ld_data,        // aligned load data (0 on a faulting load)
     // OUTPUTS:
     // EX write request (to the bank of the thread in EX)
     output logic    w_ex_we,
     output RegAddr  w_ex_addr,
+    output Thread   w_ex_thread,
     output Word     w_ex_data,
     // load-return write request (to the bank of the thread in IF)
     output logic    w_ld_we,
     output RegAddr  w_ld_addr,
+    output Thread   w_ld_thread,
     output Word     w_ld_data
 );
 
@@ -44,10 +48,12 @@ module mda_wb #(
 
     assign w_ex_we   = ex_v & reg_write & ((HAS_STAGE_B != 0) | ~sp_valid);
     assign w_ex_addr = rd_addr;
+    assign w_ex_thread = ex_thread;
 
     // the load return passes through unchanged
     assign w_ld_we   = ld_valid;
     assign w_ld_addr = ld_rd;
+    assign w_ld_thread = ld_thread;
     assign w_ld_data = ld_data;
 
 endmodule
