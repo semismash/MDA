@@ -1,8 +1,14 @@
 == RTL configuration (simulation RAM)
 - V e r i l a t i o n   R e p o r t: Verilator 5.048 2026-04-26 rev vUNKNOWN-built20260428
-- Verilator: Built from 1.332 MB sources in 28 modules, into 0.168 MB in 4 C++ files needing 0.000 MB
-- Verilator: Walltime 0.076 s (elab=0.008, cvt=0.032, bld=0.000); cpu 0.000 s on 1 threads; allocated 19.117 MB
+- Verilator: Built from 1.333 MB sources in 28 modules, into 0.168 MB in 4 C++ files needing 0.000 MB
+- Verilator: Walltime 0.067 s (elab=0.012, cvt=0.037, bld=0.000); cpu 0.000 s on 1 threads; allocated 19.148 MB
 == macro configuration (-DMDA_SRAM_MACRO, with the macro stubs)
 - V e r i l a t i o n   R e p o r t: Verilator 5.048 2026-04-26 rev vUNKNOWN-built20260428
-- Verilator: Built from 1.531 MB sources in 30 modules, into 0.164 MB in 4 C++ files needing 0.000 MB
-- Verilator: Walltime 0.077 s (elab=0.009, cvt=0.030, bld=0.000); cpu 0.031 s on 1 threads; allocated 19.898 MB
+- Verilator: Built from 1.532 MB sources in 30 modules, into 0.164 MB in 4 C++ files needing 0.000 MB
+- Verilator: Walltime 0.067 s (elab=0.007, cvt=0.036, bld=0.000); cpu 0.000 s on 1 threads; allocated 19.629 MB
+== generated Verilog (src/mda_synth.v, what CI synthesizes)
+src/mda_synth.v is up to date
+== generated Verilog lint
+- V e r i l a t i o n   R e p o r t: Verilator 5.048 2026-04-26 rev vUNKNOWN-built20260428
+- Verilator: Built from 0.242 MB sources in 27 modules, into 0.163 MB in 3 C++ files needing 0.000 MB
+- Verilator: Walltime 0.056 s (elab=0.013, cvt=0.028, bld=0.000); cpu 0.000 s on 1 threads; allocated 19.461 MB

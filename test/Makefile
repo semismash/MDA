@@ -6,32 +6,7 @@ SIM ?= icarus
 FST ?= -fst # Use more efficient FST format
 TOPLEVEL_LANG ?= verilog
 SRC_DIR = $(PWD)/../src
-PROJECT_SOURCES = mda_pkg.sv \
-    mda_isa_pkg.sv \
-    mda_sync.sv \
-    mda_sram_sim.sv \
-    mda_imem.sv \
-    mda_dmem.sv \
-    mda_alu.sv \
-    mda_regfile.sv \
-    mda_regbank.sv \
-    mda_pc.sv \
-    mda_fetch.sv \
-    mda_flags.sv \
-    mda_cond.sv \
-    mda_branch_unit.sv \
-    mda_decoder.sv \
-    mda_suffix.sv \
-    mda_imm_gen.sv \
-    mda_fault.sv \
-    mda_lsu.sv \
-    mda_wb.sv \
-    mda_sched.sv \
-    mda_id_ex.sv \
-    mda_ex.sv \
-    mda_core.sv \
-    mda_top.sv \
-    mda_tt_top.sv
+PROJECT_SOURCES = mda_synth.v
 # Stand-in simulation models of the two SRAM macros (the stubs in src/ are empty blackboxes).
 # Only the gate-level run uses them, the RTL run uses the simulation RAM (mda_sram_sim).
 # TODO: switch to the foundry behavioural models from the PDK once their path is confirmed.

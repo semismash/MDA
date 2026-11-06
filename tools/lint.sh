@@ -23,5 +23,18 @@ lint "RTL configuration (simulation RAM)" "" "$RTL"
 # the macro stubs are black boxes (their outputs look undriven) and one of them carries a timescale, which makes every other module "miss" one
 lint "macro configuration (-DMDA_SRAM_MACRO, with the macro stubs)" "-DMDA_SRAM_MACRO -Wno-UNDRIVEN -Wno-TIMESCALEMOD" "$ALL"
 
+# the generated Verilog is what CI synthesizes: it must be fresh, and it is linted on its own with the macro stubs
+echo "== generated Verilog (src/mda_synth.v, what CI synthesizes)" | tee -a lint.txt
+if python3 tools/gen_synth.py --check | tee -a lint.txt | grep -q "up to date"; then
+    lint_gen=1
+else
+    rc=1; lint_gen=0
+fi
+if [ $lint_gen -eq 1 ]; then
+    # sv2v writes the zero fill '0 as the 1-bit signed constant 1'sb0, which Verilog sign-extends to zeros: correct, but WIDTHEXPAND reports it.
+    # Real width problems are caught by the SystemVerilog lint above, so it is waived here.
+    lint "generated Verilog lint" "-DMDA_SRAM_MACRO -Wno-UNDRIVEN -Wno-TIMESCALEMOD -Wno-WIDTHEXPAND" "src/mda_synth.v src/RM_IHPSG13_1P_1024x16_c2_bm_bist.v src/RM_IHPSG13_1P_256x32_c2_bm_bist.v"
+fi
+
 if [ $rc -eq 0 ]; then echo "lint clean"; else echo "see lint.txt"; fi
 exit $rc

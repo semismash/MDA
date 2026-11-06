@@ -4,8 +4,11 @@
   python3 tools/sync_sources.py            (run from the repo root)
   python3 tools/sync_sources.py --check    (exit 1 if either file is out of date, changes nothing)
 
-info.yaml   : the list under "source_files:" (file names relative to src/, in rtl.f order, asic-only files included)
-test/Makefile: the PROJECT_SOURCES line (the same list without the asic-only files)
+The SystemVerilog sources of rtl.f are converted to one plain Verilog file by tools/gen_synth.py (sv2v), because Yosys's
+front end cannot read them. So:
+
+info.yaml    : the list under "source_files:": the generated src/mda_synth.v, then the asic-only files (the macro stubs)
+test/Makefile: the PROJECT_SOURCES line: the generated file only (the simulation uses the macro models of test/)
 """
 import argparse
 import os
@@ -13,6 +16,7 @@ import re
 import sys
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
+GENERATED = 'mda_synth.v'
 
 
 def read_list(path):
@@ -39,7 +43,7 @@ def new_info(text, files):
             i += 1
             while i < len(lines) and lines[i].strip().startswith('-'):
                 i += 1
-            out.extend(f'{indent}- "{n}"' for n, _ in files)
+            out.extend(f'{indent}- "{n}"' for n in [GENERATED] + [n for n, asic in files if asic])
             done = True
             continue
         i += 1
@@ -49,7 +53,7 @@ def new_info(text, files):
 
 
 def new_make(text, files):
-    names = [n for n, asic in files if not asic]
+    names = [GENERATED]
     value = ' \\\n    '.join(names)
     pat = re.compile(r'^PROJECT_SOURCES[ \t]*=(?:[^\n]*\\\n)*[^\n]*$', re.M)
     if not pat.search(text):

@@ -51,8 +51,8 @@ module mda_alu #(
                 ALU_XOR:  result = data_1 ^ data_2;
                 ALU_AND:  result = data_1 & data_2;
                 ALU_OR:   result = data_1 | data_2;
-                ALU_CMP:  result = (data_1 == data_2) ? '0 : ((data_1 > data_2) ? one : '1);
-                ALU_CMPA: result = (data_1 == data_2) ? '0 : (($signed(data_1) > $signed(data_2)) ? one : '1);
+                ALU_CMP:  result = (data_1 == data_2) ? '0 : ((data_1 > data_2) ? one : {DATA_WIDTH{1'b1}});
+                ALU_CMPA: result = (data_1 == data_2) ? '0 : (($signed(data_1) > $signed(data_2)) ? one : {DATA_WIDTH{1'b1}});
                 ALU_SHL: begin
                     {alu_carry, result} = shl_ext;
                     alu_carry_upd = (shamt != '0);  // shift by 0 leaves the bit unchanged, alu_carry_upd

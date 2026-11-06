@@ -3,7 +3,8 @@
 #
 # RTL run: the instruction and data memories are loaded through the testbench (backdoor) while reset is held. After reset
 # the wrapper releases all three threads at address 0, so the same program runs on every thread. It sums 10..1, builds a
-# 24-bit constant with lli, stores and reloads words and bytes, and makes a call and a return. All three threads write the
+# 24-bit constant with lli, stores and reloads words and bytes, makes a call and a return, and runs unsigned and signed
+# compares (less than gives all ones, which is what the converted Verilog must get right). All three threads write the
 # same values, so the data memory after the run is fixed; it was computed with the independent eval simulator and with
 # the elaborated RTL (tools verif/mda_e2e.py). The whole data memory is compared.
 #
@@ -19,10 +20,10 @@ from cocotb.triggers import ClockCycles
 GATES = os.environ.get("GATES", "no") == "yes"
 
 # instruction memory, word address: halfword
-PROGRAM = {0: 0x200E, 1: 0x414E, 2: 0x2540, 3: 0x4BE2, 4: 0x0F79, 5: 0x800E, 6: 0x108C, 7: 0xB57E, 8: 0xCDEF, 9: 0x12AC, 10: 0xD02B, 11: 0xF952, 12: 0x6568, 13: 0x6FEA, 14: 0x11CC, 15: 0xC147, 16: 0x13EC, 17: 0x5083, 18: 0x2540, 19: 0xA0AE, 20: 0x1495, 21: 0xC02E, 22: 0x0051, 23: 0xC04E, 24: 0x330C, 25: 0xFFD1, 26: 0xFCE2, 27: 0xB813}
+PROGRAM = {0: 0x200E, 1: 0x414E, 2: 0x2540, 3: 0x4BE2, 4: 0x0F79, 5: 0x800E, 6: 0x108C, 7: 0xB57E, 8: 0xCDEF, 9: 0x12AC, 10: 0xD02B, 11: 0xF952, 12: 0x6568, 13: 0x6FEA, 14: 0x11CC, 15: 0xC227, 16: 0x13EC, 17: 0x5083, 18: 0x2540, 19: 0xA0AE, 20: 0x1495, 21: 0xC02E, 22: 0x0051, 23: 0xC04E, 24: 0x330C, 25: 0x68E0, 26: 0x31AC, 27: 0xE7EA, 28: 0xBCE8, 29: 0x32CC, 30: 0xDCE0, 31: 0x336C, 32: 0xFFD1, 33: 0xFCE2, 34: 0xB813}
 
 # data memory after the program, word index: value (all other words are 0)
-EXPECTED = {0: 0x00000037, 1: 0x00ABCDEF, 2: 0xFFFFFFFE, 3: 0x0ABCDEF3, 4: 0x00000001}
+EXPECTED = {0: 0x00000037, 1: 0x00ABCDEF, 2: 0xFFFFFFFE, 3: 0x0ABCDEF3, 4: 0x00000001, 5: 0xFFFFFFFF, 6: 0xFFFFFFFF, 7: 0x00000001}
 
 RUN_CYCLES = 1500
 
