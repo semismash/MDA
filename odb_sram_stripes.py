@@ -93,6 +93,12 @@ def extend(reader, layer, min_pairs):
     core = block.getCoreArea()
     ylo, yhi = core.yMin(), core.yMax()
     dbu = block.getDefUnits()
+    # The IHP manufacturing grid is 5 nm. Every stripe edge and via centre created below is snapped to it: a via stack whose
+    # centre is 2.5 nm off the grid puts the via cuts and the Metal2 / Metal3 pads off-grid, which fails KLayout DRC (Offgrid, V*.a, V*.b).
+    mfg = max(1, int(round(0.005 * dbu)))
+
+    def snap(v):
+        return int(round(v / mfg)) * mfg
 
     rail_vias = []
     for prefix in ("via1_2_2100_440", "via2_3_2100_440", "via3_4_2100_440"):
@@ -206,7 +212,7 @@ def extend(reader, layer, min_pairs):
         for nn_pins in declared_pins(inst).values():
             for c in nn_pins["full"] | nn_pins["rest"]:
                 pin_w_um = min(pin_w_um, (c[1] - c[0]) / dbu)
-        pin_w = int(pin_w_um * dbu)
+        pin_w = int(round(pin_w_um * dbu))
 
         corridors = set()
         for i in range(len(obs) - 1):
@@ -216,7 +222,7 @@ def extend(reader, layer, min_pairs):
             width_um = g1_um - g0_um
             if width_um <= 0 or width_um > max_corridor_um:
                 continue
-            g0, g1 = int(g0_um * dbu), int(g1_um * dbu)
+            g0, g1 = int(round(g0_um * dbu)), int(round(g1_um * dbu))
             cx = (g0 + g1) // 2
             half = pin_w // 2
             c0 = max(g0 + int(0.05 * dbu), cx - half)
@@ -380,7 +386,7 @@ def extend(reader, layer, min_pairs):
                         ry = (r.yMin() + r.yMax()) // 2
                         if not any(abs(h - ry) < 0.3 * dbu for h in have):
                             for via in rail_vias:
-                                odb.dbSBox_create(swire, via, cx, ry, "STRIPE")
+                                odb.dbSBox_create(swire, via, snap(cx), snap(ry), "STRIPE")
                             new_vias += 1
                 extended += 1
                 print(
@@ -651,6 +657,7 @@ def extend(reader, layer, min_pairs):
             stripes = [b for b in stripes if b not in crossing]
 
             for c0, c1 in columns:
+                c0, c1 = snap(c0), snap(c1)
                 stripes.append(
                     odb.dbSBox_create(swire, m, c0, ylo, c1, yhi, "STRIPE")
                 )
@@ -664,7 +671,7 @@ def extend(reader, layer, min_pairs):
                     ):
                         ry = (r.yMin() + r.yMax()) // 2
                         for via in rail_vias:
-                            odb.dbSBox_create(swire, via, cx, ry, "STRIPE")
+                            odb.dbSBox_create(swire, via, snap(cx), snap(ry), "STRIPE")
             print(
                 f"[INFO] {inst.getName()}: {net_name}: removed {removed} "
                 f"crossing tile stripes; placed {len(columns)} "
