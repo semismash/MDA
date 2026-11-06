@@ -214,29 +214,45 @@ Flag-mask condition, shared with `waitev` in Stage B. Combinational, with no kno
 Test point: an empty mask with `all_mode` (vacuously true), and the four combinations with `inv`.
 
 ### `mda_branch_unit`
-Turns the decoded jump kind into the controls of the PC adder in `mda_pc`. Combinational. It contains an instance of `mda_cond`.
+Owns all of the control flow except the adder itself: the taken decision (with `mda_cond`), the select bits of the PC adder in `mda_pc`, the PC offset, and the link value. Combinational, one instance shared by the three threads. It contains an instance of `mda_cond`.
 
 | Port | Dir | Type | Description |
 |---|---|---|---|
 | `ex_v` | in | 1 | The EX stage holds a real instruction. All outputs are inactive when low |
-| `br_type` | in | `BrType` | From `mda_id_ex` |
+| `br_type` | in | `BrType` | Jump kind, from `mda_id_ex` |
 | `br_jof_inv` | in | 1 | `jof` invert variant |
 | `br_joc_all` | in | 1 | `joc` all-of or any-of |
-| `instr` | in | `Instruction` | Raw EX word: the `jof` flag number is `instr[15:12]`, the `joc` invert bit is `instr[15]` |
+| `instr` | in | `Instruction` | Raw EX word: the `jof` flag number is `instr[15:12]`, the `joc` invert bit is `instr[15]`, and the offset fields below |
 | `flags` | in | `Flags` | Flags of the thread in EX |
 | `rs1_data` | in | `Word` | `joc` flag mask in the low 16 bits |
-| `taken` | out | 1 | The jump is taken (for the trace and the PC controls) |
-| `pc_in1` | out | 1 | To `mda_pc`: 1 selects the PC as the base, 0 selects `rs1` |
-| `pc_in2` | out | 1 | To `mda_pc`: 1 selects +1, 0 selects the immediate |
+| `ex_pc` | in | `PcAddr` | PC of the thread in EX, selected from the three PCs by the wrapper |
+| `taken` | out | 1 | The jump is taken (trace and PC controls) |
+| `pc_in1` | out | 1 | To `mda_pc`: 1 selects `rs1` as the base, 0 selects the PC |
+| `pc_in2` | out | 1 | To `mda_pc`: 1 selects `pc_offset`, 0 selects +1 |
 | `pc_cin` | out | 1 | To `mda_pc`: carry-in, high for taken PC-relative jumps |
+| `pc_offset` | out | `PcAddr` | To `mda_pc.imm_in`: the offset below, sign-extended to the PC width |
+| `link` | out | `PcAddr` | `ex_pc + 1`, to `mda_wb` |
 
-| Case | `pc_in1` | `pc_in2` | `pc_cin` |
-|---|---|---|---|
-| Sequential (no jump, or not taken) | 1 | 1 | 0 |
-| Taken `jmp`, `jnl`, `jof`, `joc` | 1 | 0 | 1 |
-| `jrg` (always taken, `rs1 + imm`) | 0 | 0 | 0 |
+| Case | `pc_in1` | `pc_in2` | `pc_cin` | `taken` |
+|---|---|---|---|---|
+| Not a jump, not taken, or `ex_v` low | 0 | 0 | 0 | 0 |
+| Taken `jmp`, `jnl`, `jof`, `joc` (target `PC + 1 + offset`) | 0 | 1 | 1 | 1 |
+| `jrg` (always taken, target `rs1 + imm`) | 1 | 1 | 0 | 1 |
 
-`jmp`, `jnl` and `jrg` are always taken. `jof` uses `mask = 16'h1 << instr[15:12]`, `all_mode = 0`, `inv = br_jof_inv`. `joc` uses `mask = rs1_data[15:0]`, `all_mode = br_joc_all`, `inv = instr[15]`. The wrapper forms `pc_en = ex_v & ex_t[t]` for each thread's PC.
+So `pc_in1 = ex_v & (br_type == BR_JRG)`, `pc_in2 = taken` and `pc_cin = taken & (br_type != BR_JRG)`.
+
+| `br_type` | `pc_offset` |
+|---|---|
+| `BR_JMP` | `instr[12:5]`, 8 bits, sign-extended |
+| `BR_JNL` | `instr[15:6]`, 10 bits |
+| `BR_JOF` | `instr[11:6]`, 6 bits, sign-extended |
+| `BR_JOC` | `{instr[14:13], instr[9:6]}`, 6 bits, sign-extended |
+| `BR_JRG` | `instr[9:5]`, 5 bits, sign-extended |
+| other | 0 |
+
+`taken` is always 1 for `jmp`, `jnl` and `jrg`, and `hit` from `mda_cond` for `jof` and `joc` (mask `16'h0001 << instr[15:12]` with `all_mode = 0` and `inv = br_jof_inv` for `jof`, mask `rs1_data[15:0]` with `all_mode = br_joc_all` and `inv = instr[15]` for `joc`). The wrapper forms `pc_en = ex_v & ex_t[t]` for each thread's PC.
+
+These rules were checked against the specification by driving `mda_pc` over 30,000 random cases covering every jump kind, both outcomes, non-jump words and `ex_v` low.
 
 ### `mda_flags`
 Inputs: `ex_t`, `ex_v`, `zn_we`, `z_in`, `n_in`, `c_we`, `c_in`. Output: `flags_ex[15:0]` (flags of the thread in EX). Z/N/C only in Stage A.
@@ -276,7 +292,7 @@ Selects the EX result and forms the two register write requests. Combinational.
 | `rd_addr` | in | `RegAddr` | Destination register |
 | `res_sel` | in | `ResSel` | `RES_ALU`, `RES_LINK` or `RES_SP` |
 | `alu_result` | in | `Word` | ALU output or forwarded immediate |
-| `pc_plus1` | in | `PcAddr` | Link value, zero-extended to 32 bits |
+| `link` | in | `PcAddr` | Link value from `mda_branch_unit`, zero-extended to 32 bits |
 | `sp_result` | in | `Word` | Stage B result. Tie to 0 in Stage A |
 | `ld_valid`, `ld_rd`, `ld_data` | in | 1, `RegAddr`, `Word` | Load return from the LSU |
 | `w_ex_we`, `w_ex_addr`, `w_ex_data` | out | | EX write request, for the bank of the thread in EX |

@@ -1,7 +1,7 @@
 import mda_pkg::*;
 
-// write-back: selects the EX result (ALU, link or Stage B) and forms the two register write requests (EX result and load return)
-// FUTURE STAGE b ONLY: with HAS_STAGE_B = 0 the Stage B instructions execute as no-ops, so their register write is maskeds
+// Write-back: selects the EX result (ALU, link or Stage B) and forms the two register write requests (EX result and load return).
+// With HAS_STAGE_B = 0 the Stage B instructions execute as no-ops, so their register write is masked.
 module mda_wb #(
     parameter HAS_STAGE_B = 0
 ) (
@@ -13,7 +13,7 @@ module mda_wb #(
     input  RegAddr  rd_addr,        // destination register
     input  ResSel   res_sel,        // result source
     input  Word     alu_result,     // ALU result, or the forwarded immediate
-    input  PcAddr   pc_plus1,       // link value (PC + 1 of the thread in EX)
+    input  PcAddr   link,           // link value (PC + 1 of the thread in EX)
     input  Word     sp_result,      // Stage B result (tie to 0 in Stage A)
     // load return (from the LSU)
     input  logic    ld_valid,       // a load result is available
@@ -31,7 +31,7 @@ module mda_wb #(
 );
 
     Word link_value;
-    assign link_value = {{(DATA_WIDTH-IMEM_ADDR_WIDTH){1'b0}}, pc_plus1};
+    assign link_value = {{(DATA_WIDTH-IMEM_ADDR_WIDTH){1'b0}}, link};
 
     // EX result select
     always_comb begin

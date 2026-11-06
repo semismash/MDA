@@ -10,7 +10,8 @@ The decoder is a pure combinational function, which keeps it exhaustively testab
 |---|---|---|
 | `mda_decoder` | combinational | `instr`, `suffix_pend` and `suffix_rd` in, control signals out |
 | `mda_suffix` | 3 pending bits (reset) plus 33 payload flops | Per-thread suffix state for the two-word `lli`, indexed by the thread in ID (section 3) |
-| `mda_imm_gen` | combinational | `instr`, `imm_sel`, `rs1_data` and `suffix_imm8` in, the 32-bit `imm_out` out. `rs1_data` is used only by `lui` |
+| `mda_imm_gen` | combinational | `instr`, `imm_sel`, `rs1_data` and `suffix_imm8` in, the 32-bit `imm_out` out. ALU and LSU immediates only (10 formats). `rs1_data` is used only by `lui` |
+| `mda_branch_unit` | combinational | Slices the PC offset from the raw instruction and computes the link value, besides the jump controls (see `Stage_A_Microarchitecture.md`) |
 
 Fields that need no decoding stay in the registered raw instruction and are read in EX: the `jof` flag number (`instr[15:12]`), the `joc` invert bit (`instr[15]`) and all Stage B fields (pin numbers, shift counts, modes, `waitev` options). The raw instruction travels in `mda_id_ex` anyway for the trace.
 
@@ -27,11 +28,11 @@ Inputs: `instr` (`Instruction`), `suffix_pend` (1), `suffix_rd` (`RegAddr`).
 | ALU and result | `alu_op` | `AluOp` | `mda_alu` | RR: `funct[2:0]`. RI-A: `{1'b0, funct[1:0]}` |
 |  | `use_imm` | 1 bit | `mda_alu` | Operand B is `imm` (RI-A) and not `rs2` (RR) |
 |  | `fwd_imm` | 1 bit | `mda_alu` | Result is `imm`. High for the immediate loads (`lbi`, `lui`, the suffix slot) and, by rule, for every instruction whose ALU result is unused (jumps, Stage B), so the ALU sees quiet inputs and the write enables decide what is written. **Low for loads and stores**, where the ALU is the address adder (`alu_op = ALU_ADD`, `use_imm = 1`, no flag update) |
-|  | `res_sel` | `ResSel` | EX result mux | `RES_ALU` (ALU output or forwarded immediate), `RES_LINK` (`pc_plus1`, for `jmp` and `jrg`), `RES_SP` (Stage B result, for `pull` and `rpin`) |
-|  | `imm_sel` | `ImmSel` | `mda_imm_gen` | One of 15 formats, section 4 |
+|  | `res_sel` | `ResSel` | EX result mux | `RES_ALU` (ALU output or forwarded immediate), `RES_LINK` (`link` from `mda_branch_unit`, for `jmp` and `jrg`), `RES_SP` (Stage B result, for `pull` and `rpin`) |
+|  | `imm_sel` | `ImmSel` | `mda_imm_gen` | One of 10 formats, section 4. Jumps use `IMM_NONE` |
 | Flags | `f_u_alu` | 1 bit | `mda_flags.u_alu` | The instruction updates Z and N: 12 instructions. Gated outside by "valid and this thread is in EX". It is the only flag enable: `u_alu_carry = u_alu & alu_carry_upd`, and the ALU raises `alu_carry_upd` only for add and for a shift by a nonzero amount |
 |  | `illegal` | 1 bit | fault path | Illegal word (unused funct, reserved bits, bad `rpin` mode). Registered to EX, where it becomes `u_err = 1`, `f_err = 1`, `f_errc = CAUSE_ILLEGAL` (Stage B). Stage A only exposes it on the trace |
-| Branch | `br_type` | `BrType` | branch unit, `mda_pc` | The branch unit turns it into `pc_en`, `pc_in1`, `pc_in2` and `pc_cin` together with the `taken` result |
+| Branch | `br_type` | `BrType` | `mda_branch_unit` | The branch unit turns it into `pc_in1`, `pc_in2`, `pc_cin`, `pc_offset` and `taken`, and computes `link` |
 |  | `br_jof_inv` | 1 bit | branch unit | High for the `jof` invert variant (funct 7). The `joc` invert bit is read from the raw instruction in EX |
 |  | `br_joc_all` | 1 bit | branch unit | `joc` all-of (`COND_ALL`) or any-of (`COND_ANY`) |
 | Memory | `mem_op` | `MemOp` | LSU | None, load, store |
@@ -62,25 +63,32 @@ Properties to preserve: a jump that lands directly on a suffix word finds `pend`
 
 | `imm_sel` | Result in `imm` | Used by |
 |---|---|---|
-| `IMM_NONE` | unused | most non-immediate instructions, and word A of `lli` |
+| `IMM_NONE` | unused | most non-immediate instructions, word A of `lli`, and all jumps |
 | `IMM_S4` | `{instr[9:7], instr[5]}` sign-extended (sign bit `instr[9]`) | `addi`, `xori` |
 | `IMM_U4` | `{instr[9:7], instr[5]}` zero-extended | `shli`, `shri` |
 | `IMM_MEM_B` | `instr[9:5]` zero-extended (byte offset) | `lb` |
 | `IMM_MEM_W` | `instr[9:5] << 2` | `lw` |
 | `IMM_ST_B` | `{instr[15:13], instr[6:5]}` zero-extended | `sb` |
 | `IMM_ST_W` | `{instr[15:13], instr[6:5]} << 2` | `sw` |
-| `IMM_S5` | `instr[9:5]` sign-extended | `jrg` |
 | `IMM_LBI` | `instr[12:5]` zero-extended | `lbi` |
 | `IMM_LUI` | `{instr[12:5], rs1_data[23:0]}` (`rs1_data` is the old `rd`) | `lui` |
 | `IMM_SUFFIX` | `{8'b0, suffix_imm8, instr}`, a zero-extended 24-bit constant | the `lli` suffix slot |
-| `IMM_S8` | `instr[12:5]` sign-extended | `jmp` |
-| `IMM_S10` | `instr[15:6]` sign-extended | `jnl` |
-| `IMM_S6` | `instr[11:6]` sign-extended | `jof`, both variants |
-| `IMM_S6B` | `{instr[14:13], instr[9:6]}` sign-extended | `joc`, both variants |
 
-Memory offsets are scaled in the immediate generator (word offsets times 4), so the LSU only adds. Relative jump offsets leave the generator unscaled. The `+1` that makes the target `PC + 1 + offset` comes from `pc_cin` in `mda_pc`.
+Memory offsets are scaled in the immediate generator (word offsets times 4), so the LSU only adds. Jump offsets are not produced here: `mda_branch_unit` slices them from the raw instruction (below), and the `+1` that makes the target `PC + 1 + offset` comes from `pc_cin` in `mda_pc`.
 
-**`mda_imm_gen` ports.** In: `instr` (`Instruction`), `imm_sel` (`ImmSel`), `rs1_data` (`Word`), `suffix_imm8` (8 bits). Out: `imm_out` (`Word`). Combinational. `IMM_S6` and `IMM_S6B` are both 6-bit sign-extended offsets taken from different bit ranges, so test them with a negative offset.
+**PC offsets (in `mda_branch_unit`).**
+
+| Jump | Offset slice | Width |
+|---|---|---|
+| `jmp` | `instr[12:5]` | 8, signed |
+| `jnl` | `instr[15:6]` | 10, signed |
+| `jof` (both variants) | `instr[11:6]` | 6, signed |
+| `joc` (both variants) | `{instr[14:13], instr[9:6]}` | 6, signed |
+| `jrg` | `instr[9:5]` | 5, signed |
+
+Each is sign-extended to the PC width (10 bits) and fed to `mda_pc.imm_in`. Only ten bits are needed because the PC adder wraps modulo the instruction memory size.
+
+**`mda_imm_gen` ports.** In: `instr` (`Instruction`), `imm_sel` (`ImmSel`), `rs1_data` (`Word`), `suffix_imm8` (8 bits). Out: `imm_out` (`Word`). Combinational.
 
 ## 5. Rules
 
@@ -114,23 +122,23 @@ Memory offsets are scaled in the immediate generator (word offsets times 4), so 
 | `shri` | RI-A / 3 | rs1 | - | rd | wb bit | ALU_SHR | 1 | 0 | ALU | U4 | 1 | - | - | - | - | - | - | 0 |
 | `lb` | RI-Z / 0 | rs1 | - | rd | 0 (load return) | ALU_ADD | 1 | 0 | - | MEM_B | 0 | - | - | - | MEM_LOAD | 1 | - | 0 |
 | `lw` | RI-Z / 1 | rs1 | - | rd | 0 (load return) | ALU_ADD | 1 | 0 | - | MEM_W | 0 | - | - | - | MEM_LOAD | 0 | - | 0 |
-| `jrg` | RI-Z / 2 | rs1 | - | rd | 1 | - | - | 1 | LINK | S5 | 0 | BR_JRG | - | - | - | - | - | 0 |
+| `jrg` | RI-Z / 2 | rs1 | - | rd | 1 | - | - | 1 | LINK | - | 0 | BR_JRG | - | - | - | - | - | 0 |
 | `lui` | DI-L / 0 | rd | - | rd | 1 | - | - | 1 | ALU | LUI | 0 | - | - | - | - | - | - | 0 |
 | `lbi` | DI-L / 1 | - | - | rd | 1 | - | - | 1 | ALU | LBI | 0 | - | - | - | - | - | - | 0 |
 | `lli` | DI-L / 3 | - | - | - | 0 (word A is a no-op) | - | - | 1 | - | NONE | 0 | - | - | - | - | - | - | 1 |
-| `jmp` | DI-Z / 0 | - | - | rd | 1 | - | - | 1 | LINK | S8 | 0 | BR_JMP | - | - | - | - | - | 0 |
+| `jmp` | DI-Z / 0 | - | - | rd | 1 | - | - | 1 | LINK | - | 0 | BR_JMP | - | - | - | - | - | 0 |
 | `pull` | DI-Z / 1 | - | - | rd | 1 | - | - | 1 | SP | - | 0 | - | - | - | - | - | 1 | 0 |
 | `rpin` | DI-Z / 3 | - | - | rd | 1 | - | - | 1 | SP | - | 0 | - | - | - | - | - | 5 | 0 |
 | `inp` | NX / 0 | - | - | - | 0 | - | - | 1 | - | - | 0 | - | - | - | - | - | 3 | 0 |
 | `outp` | NX / 1 | - | - | - | 0 | - | - | 1 | - | - | 0 | - | - | - | - | - | 4 | 0 |
-| `jnl` | NX / 2 | - | - | - | 0 | - | - | 1 | - | S10 | 0 | BR_JNL | - | - | - | - | - | 0 |
-| `jof` | NX / 3 | - | - | - | 0 | - | - | 1 | - | S6 | 0 | BR_JOF | 0 | - | - | - | - | 0 |
+| `jnl` | NX / 2 | - | - | - | 0 | - | - | 1 | - | - | 0 | BR_JNL | - | - | - | - | - | 0 |
+| `jof` | NX / 3 | - | - | - | 0 | - | - | 1 | - | - | 0 | BR_JOF | 0 | - | - | - | - | 0 |
 | `dl` | NX / 4 | - | - | - | 0 | - | - | 1 | - | - | 0 | - | - | - | - | - | 7 | 0 |
 | `flg` | NX / 6 | - | - | - | 0 | - | - | 1 | - | - | 0 | - | - | - | - | - | 11 | 0 |
-| `jof_inv (jof)` | NX / 7 | - | - | - | 0 | - | - | 1 | - | S6 | 0 | BR_JOF | 1 | - | - | - | - | 0 |
-| `joc_any (joc)` | RX / 0 | rs1 | - | - | 0 | - | - | 1 | - | S6B | 0 | BR_JOC | - | 0 | - | - | - | 0 |
+| `jof_inv (jof)` | NX / 7 | - | - | - | 0 | - | - | 1 | - | - | 0 | BR_JOF | 1 | - | - | - | - | 0 |
+| `joc_any (joc)` | RX / 0 | rs1 | - | - | 0 | - | - | 1 | - | - | 0 | BR_JOC | - | 0 | - | - | - | 0 |
 | `push` | RX / 1 | rs1 | - | - | 0 | - | - | 1 | - | - | 0 | - | - | - | - | - | 2 | 0 |
-| `joc_all (joc)` | RX / 2 | rs1 | - | - | 0 | - | - | 1 | - | S6B | 0 | BR_JOC | - | 1 | - | - | - | 0 |
+| `joc_all (joc)` | RX / 2 | rs1 | - | - | 0 | - | - | 1 | - | - | 0 | BR_JOC | - | 1 | - | - | - | 0 |
 | `wpin` | RX / 3 | rs1 | - | - | 0 | - | - | 1 | - | - | 0 | - | - | - | - | - | 6 | 0 |
 | `dlrg` | RX / 4 | rs1 | - | - | 0 | - | - | 1 | - | - | 0 | - | - | - | - | - | 8 | 0 |
 | `waitev` | RX / 6 | rs1 | - | - | 0 | - | - | 1 | - | - | 0 | - | - | - | - | - | 9 | 0 |

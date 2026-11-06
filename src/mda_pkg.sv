@@ -116,12 +116,11 @@ package mda_pkg;
     localparam logic COND_ANY = 1'b0;
     localparam logic COND_ALL = 1'b1;
 
-    // Immediate format select. The decoder chooses one of 15 formats and the immediate generator
+    // Immediate format select. The decoder chooses one of 10 formats and the immediate generator
     // builds the 32-bit immediate from the instruction word. IMM_LUI merges with the old rd, which
     // arrives through register read port 1 (rs1_data). IMM_SUFFIX builds the whole 24-bit constant of
     // lli from the upper byte captured from word A (suffix_imm8) and the suffix word itself.
-    // Memory offsets are scaled here (word offsets times 4), so the LSU only adds. Relative jump
-    // offsets are left unscaled: the +1 of PC + 1 + offset is added by the carry-in of the PC adder.
+    // Memory offsets are scaled here (word offsets times 4), so the LSU only adds.
     typedef logic [3:0] ImmSel;
     localparam ImmSel IMM_NONE   = 4'd0;                    // unused
     localparam ImmSel IMM_S4     = 4'd1;                    // {instr[9:7], instr[5]} sign-extended                   (addi, xori)
@@ -130,14 +129,9 @@ package mda_pkg;
     localparam ImmSel IMM_MEM_W  = 4'd4;                    // instr[9:5] << 2                                        (lw)
     localparam ImmSel IMM_ST_B   = 4'd5;                    // {instr[15:13], instr[6:5]} zero-extended               (sb)
     localparam ImmSel IMM_ST_W   = 4'd6;                    // {instr[15:13], instr[6:5]} << 2                        (sw)
-    localparam ImmSel IMM_S5     = 4'd7;                    // instr[9:5] sign-extended                               (jrg)
-    localparam ImmSel IMM_LBI    = 4'd8;                    // instr[12:5] zero-extended                              (lbi)
-    localparam ImmSel IMM_LUI    = 4'd9;                    // {instr[12:5], rs1_data[23:0]}, rs1_data is the old rd  (lui)
-    localparam ImmSel IMM_SUFFIX = 4'd10;                   // {8'b0, suffix_imm8, instr}, zero-extended 24-bit constant  (lli, suffix slot)
-    localparam ImmSel IMM_S8     = 4'd11;                   // instr[12:5] sign-extended                              (jmp)
-    localparam ImmSel IMM_S10    = 4'd12;                   // instr[15:6] sign-extended                              (jnl)
-    localparam ImmSel IMM_S6     = 4'd13;                   // instr[11:6] sign-extended                              (jof, both variants)
-    localparam ImmSel IMM_S6B    = 4'd14;                   // {instr[14:13], instr[9:6]} sign-extended               (joc, both variants)
+    localparam ImmSel IMM_LBI    = 4'd7;                    // instr[12:5] zero-extended                              (lbi)
+    localparam ImmSel IMM_LUI    = 4'd8;                    // {instr[12:5], rs1_data[23:0]}, rs1_data is the old rd  (lui)
+    localparam ImmSel IMM_SUFFIX = 4'd9;                    // {8'b0, suffix_imm8, instr}, zero-extended 24-bit constant  (lli, suffix slot)
 
     // Source of the EX-stage result.
     typedef logic [1:0] ResSel;

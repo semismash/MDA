@@ -20,14 +20,9 @@ module mda_imm_gen #(
             IMM_MEM_W:  imm_out = {{(DATA_WIDTH-7){1'b0}}, instr[9:5], 2'b00};                           // lw: word offset times 4
             IMM_ST_B:   imm_out = {{(DATA_WIDTH-5){1'b0}}, instr[15:13], instr[6:5]};                    // sb: byte offset
             IMM_ST_W:   imm_out = {{(DATA_WIDTH-7){1'b0}}, instr[15:13], instr[6:5], 2'b00};             // sw: word offset times 4
-            IMM_S5:     imm_out = {{(DATA_WIDTH-5){instr[9]}}, instr[9:5]};                              // jrg: signed 5 bits
             IMM_LBI:    imm_out = {{(DATA_WIDTH-8){1'b0}}, instr[12:5]};                                 // lbi: unsigned 8 bits
             IMM_LUI:    imm_out = {instr[12:5], rs1_data[23:0]};                                         // lui: new top byte, old low 24 bits of rd
             IMM_SUFFIX: imm_out = {{(DATA_WIDTH-24){1'b0}}, suffix_imm8, instr};                         // lli suffix slot: 24-bit constant
-            IMM_S8:     imm_out = {{(DATA_WIDTH-8){instr[12]}}, instr[12:5]};                            // jmp: signed 8 bits
-            IMM_S10:    imm_out = {{(DATA_WIDTH-10){instr[15]}}, instr[15:6]};                           // jnl: signed 10 bits
-            IMM_S6:     imm_out = {{(DATA_WIDTH-6){instr[11]}}, instr[11:6]};                            // jof: signed 6 bits
-            IMM_S6B:    imm_out = {{(DATA_WIDTH-6){instr[14]}}, instr[14:13], instr[9:6]};               // joc: signed 6 bits from two ranges
             default:    imm_out = '0;
         endcase
     end

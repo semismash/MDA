@@ -121,7 +121,6 @@ module mda_decoder #(
                         res_sel = RES_LINK;
                         fwd_imm = 1'b1;
                         br_type = BR_JRG;
-                        imm_sel = IMM_S5;
                     end
                     default: illegal = 1'b1;
                 endcase
@@ -148,7 +147,6 @@ module mda_decoder #(
                     FN_DIZ_JMP: begin
                         res_sel = RES_LINK;
                         br_type = BR_JMP;
-                        imm_sel = IMM_S8;
                     end
                     FN_DIZ_PULL: begin  // Stage B instruction, and its reserved bits must be zero
                         res_sel = RES_SP;
@@ -169,16 +167,13 @@ module mda_decoder #(
                 case (funct3)
                     FN_NX_JNL: begin
                         br_type = BR_JNL;
-                        imm_sel = IMM_S10;
                     end
                     FN_NX_JOF: begin
                         br_type = BR_JOF;
-                        imm_sel = IMM_S6;
                     end
                     FN_NX_JOF_INV: begin
                         br_type = BR_JOF;
                         br_jof_inv = 1'b1;
-                        imm_sel = IMM_S6;
                     end
                     FN_NX_INP: begin
                         sp_valid = 1'b1;
@@ -206,12 +201,10 @@ module mda_decoder #(
                 case (funct3)
                     FN_RX_JOC_ANY: begin
                         br_type = BR_JOC;
-                        imm_sel = IMM_S6B;
                     end
                     FN_RX_JOC_ALL: begin
                         br_type = BR_JOC;
                         br_joc_all = 1'b1;
-                        imm_sel = IMM_S6B;
                     end
                     FN_RX_PUSH: begin
                         sp_valid = 1'b1;
