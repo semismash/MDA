@@ -1,0 +1,1776 @@
+{
+ "sha256": "a2def3e3217f9752127b3d0ca6bf16de9e2834c423f82046f4864a82389ed783",
+ "types": {
+  "RR": {
+   "opcode": 0,
+   "funct": [
+    5,
+    3
+   ],
+   "regs": {
+    "rd": [
+     15,
+     13
+    ],
+    "rs1": [
+     12,
+     10
+    ],
+    "rs2": [
+     9,
+     7
+    ],
+    "wb": [
+     6,
+     6
+    ]
+   },
+   "unused_funct": []
+  },
+  "NX": {
+   "opcode": 1,
+   "funct": [
+    5,
+    3
+   ],
+   "regs": {},
+   "unused_funct": [
+    5
+   ]
+  },
+  "RI-A": {
+   "opcode": 2,
+   "funct": [
+    4,
+    3
+   ],
+   "regs": {
+    "rd": [
+     15,
+     13
+    ],
+    "rs1": [
+     12,
+     10
+    ],
+    "wb": [
+     5,
+     5
+    ]
+   },
+   "unused_funct": []
+  },
+  "RI-Z": {
+   "opcode": 3,
+   "funct": [
+    4,
+    3
+   ],
+   "regs": {
+    "rd": [
+     15,
+     13
+    ],
+    "rs1": [
+     12,
+     10
+    ]
+   },
+   "unused_funct": [
+    3
+   ]
+  },
+  "SX": {
+   "opcode": 4,
+   "funct": [
+    4,
+    3
+   ],
+   "regs": {
+    "rs1": [
+     12,
+     10
+    ],
+    "rs2": [
+     9,
+     7
+    ]
+   },
+   "unused_funct": [
+    2,
+    3
+   ]
+  },
+  "RX": {
+   "opcode": 5,
+   "funct": [
+    5,
+    3
+   ],
+   "regs": {
+    "rs1": [
+     12,
+     10
+    ]
+   },
+   "unused_funct": [
+    5
+   ]
+  },
+  "DI-L": {
+   "opcode": 6,
+   "funct": [
+    4,
+    3
+   ],
+   "regs": {
+    "rd": [
+     15,
+     13
+    ]
+   },
+   "unused_funct": [
+    2
+   ]
+  },
+  "DI-Z": {
+   "opcode": 7,
+   "funct": [
+    4,
+    3
+   ],
+   "regs": {
+    "rd": [
+     15,
+     13
+    ]
+   },
+   "unused_funct": [
+    2
+   ]
+  }
+ },
+ "instructions": {
+  "add": {
+   "name": "add",
+   "mnemonic": "add",
+   "type": "RR",
+   "funct": 0,
+   "group": "register_ops",
+   "stage": "A",
+   "src": [
+    "rs1",
+    "rs2"
+   ],
+   "dst": "rd",
+   "dst_when": "wb",
+   "alu": "add",
+   "b_src": "rs2",
+   "flags": [
+    "Z",
+    "N",
+    "C"
+   ],
+   "c_rule": "carry",
+   "funct_bits": [
+    5,
+    3
+   ],
+   "opcode": 0,
+   "fields": {},
+   "reserved": []
+  },
+  "xor": {
+   "name": "xor",
+   "mnemonic": "xor",
+   "type": "RR",
+   "funct": 1,
+   "group": "register_ops",
+   "stage": "A",
+   "src": [
+    "rs1",
+    "rs2"
+   ],
+   "dst": "rd",
+   "dst_when": "wb",
+   "alu": "xor",
+   "b_src": "rs2",
+   "flags": [
+    "Z",
+    "N"
+   ],
+   "funct_bits": [
+    5,
+    3
+   ],
+   "opcode": 0,
+   "fields": {},
+   "reserved": []
+  },
+  "shl": {
+   "name": "shl",
+   "mnemonic": "shl",
+   "type": "RR",
+   "funct": 2,
+   "group": "register_ops",
+   "stage": "A",
+   "src": [
+    "rs1",
+    "rs2"
+   ],
+   "dst": "rd",
+   "dst_when": "wb",
+   "alu": "shl",
+   "b_src": "rs2",
+   "flags": [
+    "Z",
+    "N",
+    "C"
+   ],
+   "c_rule": "shift_out",
+   "note": "rs2 is the shift amount (low 5 bits). A shift by 0 leaves C unchanged",
+   "funct_bits": [
+    5,
+    3
+   ],
+   "opcode": 0,
+   "fields": {},
+   "reserved": []
+  },
+  "shr": {
+   "name": "shr",
+   "mnemonic": "shr",
+   "type": "RR",
+   "funct": 3,
+   "group": "register_ops",
+   "stage": "A",
+   "src": [
+    "rs1",
+    "rs2"
+   ],
+   "dst": "rd",
+   "dst_when": "wb",
+   "alu": "shr",
+   "b_src": "rs2",
+   "flags": [
+    "Z",
+    "N",
+    "C"
+   ],
+   "c_rule": "shift_out",
+   "note": "logical shift right. A shift by 0 leaves C unchanged",
+   "funct_bits": [
+    5,
+    3
+   ],
+   "opcode": 0,
+   "fields": {},
+   "reserved": []
+  },
+  "cmp": {
+   "name": "cmp",
+   "mnemonic": "cmp",
+   "type": "RR",
+   "funct": 4,
+   "group": "register_ops",
+   "stage": "A",
+   "src": [
+    "rs1",
+    "rs2"
+   ],
+   "dst": "rd",
+   "dst_when": "wb",
+   "alu": "cmp",
+   "b_src": "rs2",
+   "flags": [
+    "Z",
+    "N"
+   ],
+   "flag_rule": "cmp",
+   "note": "unsigned. rd = 1 if rs1 < rs2. N = less, Z = equal, otherwise both 0",
+   "funct_bits": [
+    5,
+    3
+   ],
+   "opcode": 0,
+   "fields": {},
+   "reserved": []
+  },
+  "cmpa": {
+   "name": "cmpa",
+   "mnemonic": "cmpa",
+   "type": "RR",
+   "funct": 5,
+   "group": "register_ops",
+   "stage": "A",
+   "src": [
+    "rs1",
+    "rs2"
+   ],
+   "dst": "rd",
+   "dst_when": "wb",
+   "alu": "cmpa",
+   "b_src": "rs2",
+   "flags": [
+    "Z",
+    "N"
+   ],
+   "flag_rule": "cmp",
+   "note": "signed compare, same flag rules as cmp",
+   "funct_bits": [
+    5,
+    3
+   ],
+   "opcode": 0,
+   "fields": {},
+   "reserved": []
+  },
+  "and": {
+   "name": "and",
+   "mnemonic": "and",
+   "type": "RR",
+   "funct": 6,
+   "group": "register_ops",
+   "stage": "A",
+   "src": [
+    "rs1",
+    "rs2"
+   ],
+   "dst": "rd",
+   "dst_when": "wb",
+   "alu": "and",
+   "b_src": "rs2",
+   "flags": [
+    "Z",
+    "N"
+   ],
+   "funct_bits": [
+    5,
+    3
+   ],
+   "opcode": 0,
+   "fields": {},
+   "reserved": []
+  },
+  "or": {
+   "name": "or",
+   "mnemonic": "or",
+   "type": "RR",
+   "funct": 7,
+   "group": "register_ops",
+   "stage": "A",
+   "src": [
+    "rs1",
+    "rs2"
+   ],
+   "dst": "rd",
+   "dst_when": "wb",
+   "alu": "or",
+   "b_src": "rs2",
+   "flags": [
+    "Z",
+    "N"
+   ],
+   "funct_bits": [
+    5,
+    3
+   ],
+   "opcode": 0,
+   "fields": {},
+   "reserved": []
+  },
+  "addi": {
+   "name": "addi",
+   "mnemonic": "addi",
+   "type": "RI-A",
+   "funct": 0,
+   "group": "immediate_ops",
+   "stage": "A",
+   "src": [
+    "rs1"
+   ],
+   "dst": "rd",
+   "dst_when": "wb",
+   "alu": "add",
+   "b_src": "imm",
+   "flags": [
+    "Z",
+    "N",
+    "C"
+   ],
+   "c_rule": "carry",
+   "funct_bits": [
+    4,
+    3
+   ],
+   "opcode": 2,
+   "fields": {
+    "imm": {
+     "bits": [
+      [
+       9,
+       6
+      ]
+     ],
+     "width": 4,
+     "signed": true,
+     "addr_scale": 1,
+     "bias": 0,
+     "range": [
+      -8,
+      7
+     ]
+    }
+   },
+   "reserved": []
+  },
+  "xori": {
+   "name": "xori",
+   "mnemonic": "xori",
+   "type": "RI-A",
+   "funct": 1,
+   "group": "immediate_ops",
+   "stage": "A",
+   "src": [
+    "rs1"
+   ],
+   "dst": "rd",
+   "dst_when": "wb",
+   "alu": "xor",
+   "b_src": "imm",
+   "flags": [
+    "Z",
+    "N"
+   ],
+   "note": "imm = -1 is a NOT",
+   "funct_bits": [
+    4,
+    3
+   ],
+   "opcode": 2,
+   "fields": {
+    "imm": {
+     "bits": [
+      [
+       9,
+       6
+      ]
+     ],
+     "width": 4,
+     "signed": true,
+     "addr_scale": 1,
+     "bias": 0,
+     "range": [
+      -8,
+      7
+     ]
+    }
+   },
+   "reserved": []
+  },
+  "shli": {
+   "name": "shli",
+   "mnemonic": "shli",
+   "type": "RI-A",
+   "funct": 2,
+   "group": "immediate_ops",
+   "stage": "A",
+   "src": [
+    "rs1"
+   ],
+   "dst": "rd",
+   "dst_when": "wb",
+   "alu": "shl",
+   "b_src": "imm",
+   "flags": [
+    "Z",
+    "N",
+    "C"
+   ],
+   "c_rule": "shift_out",
+   "funct_bits": [
+    4,
+    3
+   ],
+   "opcode": 2,
+   "fields": {
+    "imm": {
+     "bits": [
+      [
+       9,
+       6
+      ]
+     ],
+     "width": 4,
+     "signed": false,
+     "addr_scale": 1,
+     "bias": 0,
+     "range": [
+      0,
+      15
+     ]
+    }
+   },
+   "reserved": []
+  },
+  "shri": {
+   "name": "shri",
+   "mnemonic": "shri",
+   "type": "RI-A",
+   "funct": 3,
+   "group": "immediate_ops",
+   "stage": "A",
+   "src": [
+    "rs1"
+   ],
+   "dst": "rd",
+   "dst_when": "wb",
+   "alu": "shr",
+   "b_src": "imm",
+   "flags": [
+    "Z",
+    "N",
+    "C"
+   ],
+   "c_rule": "shift_out",
+   "funct_bits": [
+    4,
+    3
+   ],
+   "opcode": 2,
+   "fields": {
+    "imm": {
+     "bits": [
+      [
+       9,
+       6
+      ]
+     ],
+     "width": 4,
+     "signed": false,
+     "addr_scale": 1,
+     "bias": 0,
+     "range": [
+      0,
+      15
+     ]
+    }
+   },
+   "reserved": []
+  },
+  "lb": {
+   "name": "lb",
+   "mnemonic": "lb",
+   "type": "RI-Z",
+   "funct": 0,
+   "group": "memory",
+   "stage": "A",
+   "src": [
+    "rs1"
+   ],
+   "dst": "rd",
+   "dst_when": "always",
+   "mem": {
+    "op": "load",
+    "size": "byte"
+   },
+   "note": "address = rs1 + off. Unsigned load",
+   "funct_bits": [
+    4,
+    3
+   ],
+   "opcode": 3,
+   "fields": {
+    "offset": {
+     "bits": [
+      [
+       9,
+       5
+      ]
+     ],
+     "width": 5,
+     "signed": false,
+     "addr_scale": 1,
+     "bias": 0,
+     "range": [
+      0,
+      31
+     ]
+    }
+   },
+   "reserved": []
+  },
+  "lw": {
+   "name": "lw",
+   "mnemonic": "lw",
+   "type": "RI-Z",
+   "funct": 1,
+   "group": "memory",
+   "stage": "A",
+   "src": [
+    "rs1"
+   ],
+   "dst": "rd",
+   "dst_when": "always",
+   "mem": {
+    "op": "load",
+    "size": "word"
+   },
+   "note": "address = rs1 + 4 * off. Aligned",
+   "funct_bits": [
+    4,
+    3
+   ],
+   "opcode": 3,
+   "fields": {
+    "offset": {
+     "bits": [
+      [
+       9,
+       5
+      ]
+     ],
+     "width": 5,
+     "signed": false,
+     "addr_scale": 4,
+     "bias": 0,
+     "range": [
+      0,
+      31
+     ]
+    }
+   },
+   "reserved": []
+  },
+  "jrg": {
+   "name": "jrg",
+   "mnemonic": "jrg",
+   "type": "RI-Z",
+   "funct": 2,
+   "group": "jumps",
+   "stage": "A",
+   "src": [
+    "rs1"
+   ],
+   "dst": "rd",
+   "dst_when": "always",
+   "branch": {
+    "kind": "jrg",
+    "base": "rs1"
+   },
+   "link": true,
+   "note": "target = rs1 + imm (low bits that fit the PC), rd = address of the next instruction",
+   "funct_bits": [
+    4,
+    3
+   ],
+   "opcode": 3,
+   "fields": {
+    "imm": {
+     "bits": [
+      [
+       9,
+       5
+      ]
+     ],
+     "width": 5,
+     "signed": true,
+     "addr_scale": 1,
+     "bias": 0,
+     "range": [
+      -16,
+      15
+     ]
+    }
+   },
+   "reserved": []
+  },
+  "lui": {
+   "name": "lui",
+   "mnemonic": "lui",
+   "type": "DI-L",
+   "funct": 0,
+   "group": "immediate_loading",
+   "stage": "A",
+   "src": [
+    "rd"
+   ],
+   "dst": "rd",
+   "dst_when": "always",
+   "alu": "lui",
+   "b_src": "imm",
+   "note": "rd[31:24] = imm, the rest of rd is kept (rd is also a source)",
+   "funct_bits": [
+    4,
+    3
+   ],
+   "opcode": 6,
+   "fields": {
+    "imm": {
+     "bits": [
+      [
+       12,
+       5
+      ]
+     ],
+     "width": 8,
+     "signed": false,
+     "addr_scale": 1,
+     "bias": 0,
+     "range": [
+      0,
+      255
+     ]
+    }
+   },
+   "reserved": []
+  },
+  "lbi": {
+   "name": "lbi",
+   "mnemonic": "lbi",
+   "type": "DI-L",
+   "funct": 1,
+   "group": "immediate_loading",
+   "stage": "A",
+   "src": [],
+   "dst": "rd",
+   "dst_when": "always",
+   "alu": "passb",
+   "b_src": "imm",
+   "note": "rd = imm, zero extended",
+   "funct_bits": [
+    4,
+    3
+   ],
+   "opcode": 6,
+   "fields": {
+    "imm": {
+     "bits": [
+      [
+       12,
+       5
+      ]
+     ],
+     "width": 8,
+     "signed": false,
+     "addr_scale": 1,
+     "bias": 0,
+     "range": [
+      0,
+      255
+     ]
+    }
+   },
+   "reserved": []
+  },
+  "lli": {
+   "name": "lli",
+   "mnemonic": "lli",
+   "type": "DI-L",
+   "funct": 3,
+   "group": "immediate_loading",
+   "stage": "A",
+   "src": [],
+   "dst": "rd",
+   "dst_when": "always",
+   "alu": "passb",
+   "b_src": "imm",
+   "uses_suffix": true,
+   "note": "imm is bits [23:16] of the 24-bit constant. The suffix halfword that follows is bits [15:0]. Takes 2 addresses and 2 slots",
+   "funct_bits": [
+    4,
+    3
+   ],
+   "opcode": 6,
+   "fields": {
+    "imm": {
+     "bits": [
+      [
+       12,
+       5
+      ]
+     ],
+     "width": 8,
+     "signed": false,
+     "addr_scale": 1,
+     "bias": 0,
+     "range": [
+      0,
+      255
+     ]
+    }
+   },
+   "reserved": []
+  },
+  "jmp": {
+   "name": "jmp",
+   "mnemonic": "jmp",
+   "type": "DI-Z",
+   "funct": 0,
+   "group": "jumps",
+   "stage": "A",
+   "src": [],
+   "dst": "rd",
+   "dst_when": "always",
+   "branch": {
+    "kind": "jmp",
+    "base": "pc_next"
+   },
+   "link": true,
+   "note": "target = PC + 1 + off, rd = PC + 1",
+   "funct_bits": [
+    4,
+    3
+   ],
+   "opcode": 7,
+   "fields": {
+    "offset": {
+     "bits": [
+      [
+       12,
+       5
+      ]
+     ],
+     "width": 8,
+     "signed": true,
+     "addr_scale": 1,
+     "bias": 0,
+     "range": [
+      -128,
+      127
+     ]
+    }
+   },
+   "reserved": []
+  },
+  "pull": {
+   "name": "pull",
+   "mnemonic": "pull",
+   "type": "DI-Z",
+   "funct": 1,
+   "group": "spatial",
+   "stage": "B",
+   "src": [],
+   "dst": "rd",
+   "dst_when": "always",
+   "reserved": [
+    [
+     12,
+     10
+    ]
+   ],
+   "funct_bits": [
+    4,
+    3
+   ],
+   "opcode": 7,
+   "fields": {
+    "shift": {
+     "bits": [
+      [
+       9,
+       5
+      ]
+     ],
+     "width": 5,
+     "signed": false,
+     "addr_scale": 1,
+     "bias": 0,
+     "range": [
+      0,
+      31
+     ]
+    }
+   }
+  },
+  "rpin": {
+   "name": "rpin",
+   "mnemonic": "rpin",
+   "type": "DI-Z",
+   "funct": 3,
+   "group": "spatial",
+   "stage": "B",
+   "src": [],
+   "dst": "rd",
+   "dst_when": "always",
+   "illegal_values": {
+    "mode": [
+     5,
+     6,
+     7
+    ]
+   },
+   "note": "pin number above 23 is a runtime fault (bad pin access), not an illegal word. For the two pending modes the pin field is ignored",
+   "funct_bits": [
+    4,
+    3
+   ],
+   "opcode": 7,
+   "fields": {
+    "pin": {
+     "bits": [
+      [
+       12,
+       8
+      ]
+     ],
+     "width": 5,
+     "signed": false,
+     "addr_scale": 1,
+     "bias": 0,
+     "range": [
+      0,
+      31
+     ]
+    },
+    "mode": {
+     "bits": [
+      [
+       7,
+       5
+      ]
+     ],
+     "width": 3,
+     "signed": false,
+     "addr_scale": 1,
+     "bias": 0,
+     "range": [
+      0,
+      7
+     ]
+    }
+   },
+   "reserved": []
+  },
+  "inp": {
+   "name": "inp",
+   "mnemonic": "inp",
+   "type": "NX",
+   "funct": 0,
+   "group": "spatial",
+   "stage": "B",
+   "reserved": [
+    [
+     15,
+     11
+    ]
+   ],
+   "funct_bits": [
+    5,
+    3
+   ],
+   "opcode": 1,
+   "fields": {
+    "count": {
+     "bits": [
+      [
+       10,
+       6
+      ]
+     ],
+     "width": 5,
+     "signed": false,
+     "addr_scale": 1,
+     "bias": 1,
+     "range": [
+      1,
+      32
+     ]
+    }
+   }
+  },
+  "outp": {
+   "name": "outp",
+   "mnemonic": "outp",
+   "type": "NX",
+   "funct": 1,
+   "group": "spatial",
+   "stage": "B",
+   "reserved": [
+    [
+     15,
+     11
+    ]
+   ],
+   "funct_bits": [
+    5,
+    3
+   ],
+   "opcode": 1,
+   "fields": {
+    "count": {
+     "bits": [
+      [
+       10,
+       6
+      ]
+     ],
+     "width": 5,
+     "signed": false,
+     "addr_scale": 1,
+     "bias": 1,
+     "range": [
+      1,
+      32
+     ]
+    }
+   }
+  },
+  "jnl": {
+   "name": "jnl",
+   "mnemonic": "jnl",
+   "type": "NX",
+   "funct": 2,
+   "group": "jumps",
+   "stage": "A",
+   "branch": {
+    "kind": "jnl",
+    "base": "pc_next"
+   },
+   "note": "target = PC + 1 + off, wrapping around the instruction memory. Offset 0 is the nop",
+   "funct_bits": [
+    5,
+    3
+   ],
+   "opcode": 1,
+   "fields": {
+    "offset": {
+     "bits": [
+      [
+       15,
+       6
+      ]
+     ],
+     "width": 10,
+     "signed": true,
+     "addr_scale": 1,
+     "bias": 0,
+     "range": [
+      -512,
+      511
+     ]
+    }
+   },
+   "reserved": []
+  },
+  "jof": {
+   "name": "jof",
+   "mnemonic": "jof",
+   "type": "NX",
+   "funct": 3,
+   "group": "jumps",
+   "stage": "A",
+   "branch": {
+    "kind": "jof",
+    "base": "pc_next",
+    "invert": false
+   },
+   "note": "jumps if the flag is set",
+   "funct_bits": [
+    5,
+    3
+   ],
+   "opcode": 1,
+   "fields": {
+    "flag": {
+     "bits": [
+      [
+       15,
+       12
+      ]
+     ],
+     "width": 4,
+     "signed": false,
+     "addr_scale": 1,
+     "bias": 0,
+     "range": [
+      0,
+      15
+     ]
+    },
+    "offset": {
+     "bits": [
+      [
+       11,
+       6
+      ]
+     ],
+     "width": 6,
+     "signed": true,
+     "addr_scale": 1,
+     "bias": 0,
+     "range": [
+      -32,
+      31
+     ]
+    }
+   },
+   "reserved": []
+  },
+  "dl": {
+   "name": "dl",
+   "mnemonic": "dl",
+   "type": "NX",
+   "funct": 4,
+   "group": "temporal_event",
+   "stage": "B",
+   "funct_bits": [
+    5,
+    3
+   ],
+   "opcode": 1,
+   "fields": {
+    "imm": {
+     "bits": [
+      [
+       15,
+       6
+      ]
+     ],
+     "width": 10,
+     "signed": false,
+     "addr_scale": 1,
+     "bias": 0,
+     "range": [
+      0,
+      1023
+     ]
+    }
+   },
+   "reserved": []
+  },
+  "flg": {
+   "name": "flg",
+   "mnemonic": "flg",
+   "type": "NX",
+   "funct": 6,
+   "group": "config_signal",
+   "stage": "B",
+   "reserved": [
+    [
+     15,
+     12
+    ]
+   ],
+   "note": "all-zero flags is legal and does nothing",
+   "funct_bits": [
+    5,
+    3
+   ],
+   "opcode": 1,
+   "fields": {
+    "ack_err": {
+     "bits": [
+      [
+       6,
+       6
+      ]
+     ],
+     "width": 1,
+     "signed": false,
+     "addr_scale": 1,
+     "bias": 0,
+     "range": [
+      0,
+      1
+     ]
+    },
+    "ack_ovr": {
+     "bits": [
+      [
+       7,
+       7
+      ]
+     ],
+     "width": 1,
+     "signed": false,
+     "addr_scale": 1,
+     "bias": 0,
+     "range": [
+      0,
+      1
+     ]
+    },
+    "ack_msgn": {
+     "bits": [
+      [
+       8,
+       8
+      ]
+     ],
+     "width": 1,
+     "signed": false,
+     "addr_scale": 1,
+     "bias": 0,
+     "range": [
+      0,
+      1
+     ]
+    },
+    "ack_msgp": {
+     "bits": [
+      [
+       9,
+       9
+      ]
+     ],
+     "width": 1,
+     "signed": false,
+     "addr_scale": 1,
+     "bias": 0,
+     "range": [
+      0,
+      1
+     ]
+    },
+    "ring_next": {
+     "bits": [
+      [
+       10,
+       10
+      ]
+     ],
+     "width": 1,
+     "signed": false,
+     "addr_scale": 1,
+     "bias": 0,
+     "range": [
+      0,
+      1
+     ]
+    },
+    "ring_prev": {
+     "bits": [
+      [
+       11,
+       11
+      ]
+     ],
+     "width": 1,
+     "signed": false,
+     "addr_scale": 1,
+     "bias": 0,
+     "range": [
+      0,
+      1
+     ]
+    }
+   }
+  },
+  "jof_inv": {
+   "name": "jof_inv",
+   "mnemonic": "jof",
+   "type": "NX",
+   "funct": 7,
+   "group": "jumps",
+   "stage": "A",
+   "branch": {
+    "kind": "jof",
+    "base": "pc_next",
+    "invert": true
+   },
+   "note": "the inverted variant: jumps if the flag is clear (assembly: @inv)",
+   "funct_bits": [
+    5,
+    3
+   ],
+   "opcode": 1,
+   "fields": {
+    "flag": {
+     "bits": [
+      [
+       15,
+       12
+      ]
+     ],
+     "width": 4,
+     "signed": false,
+     "addr_scale": 1,
+     "bias": 0,
+     "range": [
+      0,
+      15
+     ]
+    },
+    "offset": {
+     "bits": [
+      [
+       11,
+       6
+      ]
+     ],
+     "width": 6,
+     "signed": true,
+     "addr_scale": 1,
+     "bias": 0,
+     "range": [
+      -32,
+      31
+     ]
+    }
+   },
+   "reserved": []
+  },
+  "joc_any": {
+   "name": "joc_any",
+   "mnemonic": "joc",
+   "type": "RX",
+   "funct": 0,
+   "group": "jumps",
+   "stage": "A",
+   "src": [
+    "rs1"
+   ],
+   "branch": {
+    "kind": "joc",
+    "base": "pc_next",
+    "mode": "any"
+   },
+   "note": "any (inv = 0) or none (inv = 1) of the flags in the mask rs1[15:0] are set",
+   "funct_bits": [
+    5,
+    3
+   ],
+   "opcode": 5,
+   "fields": {
+    "inv": {
+     "bits": [
+      [
+       15,
+       15
+      ]
+     ],
+     "width": 1,
+     "signed": false,
+     "addr_scale": 1,
+     "bias": 0,
+     "range": [
+      0,
+      1
+     ]
+    },
+    "offset": {
+     "bits": [
+      [
+       14,
+       13
+      ],
+      [
+       9,
+       6
+      ]
+     ],
+     "width": 6,
+     "signed": true,
+     "addr_scale": 1,
+     "bias": 0,
+     "range": [
+      -32,
+      31
+     ]
+    }
+   },
+   "reserved": []
+  },
+  "push": {
+   "name": "push",
+   "mnemonic": "push",
+   "type": "RX",
+   "funct": 1,
+   "group": "spatial",
+   "stage": "B",
+   "src": [
+    "rs1"
+   ],
+   "reserved": [
+    [
+     15,
+     14
+    ]
+   ],
+   "funct_bits": [
+    5,
+    3
+   ],
+   "opcode": 5,
+   "fields": {
+    "shift": {
+     "bits": [
+      [
+       13,
+       13
+      ],
+      [
+       9,
+       6
+      ]
+     ],
+     "width": 5,
+     "signed": false,
+     "addr_scale": 1,
+     "bias": 0,
+     "range": [
+      0,
+      31
+     ]
+    }
+   }
+  },
+  "joc_all": {
+   "name": "joc_all",
+   "mnemonic": "joc",
+   "type": "RX",
+   "funct": 2,
+   "group": "jumps",
+   "stage": "A",
+   "src": [
+    "rs1"
+   ],
+   "branch": {
+    "kind": "joc",
+    "base": "pc_next",
+    "mode": "all"
+   },
+   "note": "all (inv = 0) or not-all (inv = 1) of the flags in the mask rs1[15:0] are set",
+   "funct_bits": [
+    5,
+    3
+   ],
+   "opcode": 5,
+   "fields": {
+    "inv": {
+     "bits": [
+      [
+       15,
+       15
+      ]
+     ],
+     "width": 1,
+     "signed": false,
+     "addr_scale": 1,
+     "bias": 0,
+     "range": [
+      0,
+      1
+     ]
+    },
+    "offset": {
+     "bits": [
+      [
+       14,
+       13
+      ],
+      [
+       9,
+       6
+      ]
+     ],
+     "width": 6,
+     "signed": true,
+     "addr_scale": 1,
+     "bias": 0,
+     "range": [
+      -32,
+      31
+     ]
+    }
+   },
+   "reserved": []
+  },
+  "wpin": {
+   "name": "wpin",
+   "mnemonic": "wpin",
+   "type": "RX",
+   "funct": 3,
+   "group": "spatial",
+   "stage": "B",
+   "src": [
+    "rs1"
+   ],
+   "reserved": [
+    [
+     15,
+     14
+    ]
+   ],
+   "funct_bits": [
+    5,
+    3
+   ],
+   "opcode": 5,
+   "fields": {
+    "pin": {
+     "bits": [
+      [
+       13,
+       13
+      ],
+      [
+       9,
+       6
+      ]
+     ],
+     "width": 5,
+     "signed": false,
+     "addr_scale": 1,
+     "bias": 0,
+     "range": [
+      0,
+      31
+     ]
+    }
+   }
+  },
+  "dlrg": {
+   "name": "dlrg",
+   "mnemonic": "dlrg",
+   "type": "RX",
+   "funct": 4,
+   "group": "temporal_event",
+   "stage": "B",
+   "src": [
+    "rs1"
+   ],
+   "funct_bits": [
+    5,
+    3
+   ],
+   "opcode": 5,
+   "fields": {
+    "imm": {
+     "bits": [
+      [
+       15,
+       13
+      ],
+      [
+       9,
+       6
+      ]
+     ],
+     "width": 7,
+     "signed": false,
+     "addr_scale": 1,
+     "bias": 0,
+     "range": [
+      0,
+      127
+     ]
+    }
+   },
+   "reserved": []
+  },
+  "waitev": {
+   "name": "waitev",
+   "mnemonic": "waitev",
+   "type": "RX",
+   "funct": 6,
+   "group": "temporal_event",
+   "stage": "B",
+   "src": [
+    "rs1"
+   ],
+   "reserved": [
+    [
+     9,
+     9
+    ],
+    [
+     15,
+     13
+    ]
+   ],
+   "note": "reserved bits are the post-event delay and must be 0 for now",
+   "funct_bits": [
+    5,
+    3
+   ],
+   "opcode": 5,
+   "fields": {
+    "all": {
+     "bits": [
+      [
+       6,
+       6
+      ]
+     ],
+     "width": 1,
+     "signed": false,
+     "addr_scale": 1,
+     "bias": 0,
+     "range": [
+      0,
+      1
+     ]
+    },
+    "clear": {
+     "bits": [
+      [
+       7,
+       7
+      ]
+     ],
+     "width": 1,
+     "signed": false,
+     "addr_scale": 1,
+     "bias": 0,
+     "range": [
+      0,
+      1
+     ]
+    },
+    "consume": {
+     "bits": [
+      [
+       8,
+       8
+      ]
+     ],
+     "width": 1,
+     "signed": false,
+     "addr_scale": 1,
+     "bias": 0,
+     "range": [
+      0,
+      1
+     ]
+    }
+   }
+  },
+  "cfg": {
+   "name": "cfg",
+   "mnemonic": "cfg",
+   "type": "RX",
+   "funct": 7,
+   "group": "config_signal",
+   "stage": "B",
+   "src": [
+    "rs1"
+   ],
+   "reserved": [
+    [
+     9,
+     9
+    ],
+    [
+     15,
+     13
+    ]
+   ],
+   "note": "targets 6 and 7 are a bad cfg at run time, not illegal words",
+   "funct_bits": [
+    5,
+    3
+   ],
+   "opcode": 5,
+   "fields": {
+    "target": {
+     "bits": [
+      [
+       8,
+       6
+      ]
+     ],
+     "width": 3,
+     "signed": false,
+     "addr_scale": 1,
+     "bias": 0,
+     "range": [
+      0,
+      7
+     ]
+    }
+   }
+  },
+  "sb": {
+   "name": "sb",
+   "mnemonic": "sb",
+   "type": "SX",
+   "funct": 0,
+   "group": "memory",
+   "stage": "A",
+   "src": [
+    "rs1",
+    "rs2"
+   ],
+   "mem": {
+    "op": "store",
+    "size": "byte"
+   },
+   "note": "address = rs1 + off, data = rs2[7:0]",
+   "funct_bits": [
+    4,
+    3
+   ],
+   "opcode": 4,
+   "fields": {
+    "offset": {
+     "bits": [
+      [
+       15,
+       13
+      ],
+      [
+       6,
+       5
+      ]
+     ],
+     "width": 5,
+     "signed": false,
+     "addr_scale": 1,
+     "bias": 0,
+     "range": [
+      0,
+      31
+     ]
+    }
+   },
+   "reserved": []
+  },
+  "sw": {
+   "name": "sw",
+   "mnemonic": "sw",
+   "type": "SX",
+   "funct": 1,
+   "group": "memory",
+   "stage": "A",
+   "src": [
+    "rs1",
+    "rs2"
+   ],
+   "mem": {
+    "op": "store",
+    "size": "word"
+   },
+   "note": "address = rs1 + 4 * off, data = rs2",
+   "funct_bits": [
+    4,
+    3
+   ],
+   "opcode": 4,
+   "fields": {
+    "offset": {
+     "bits": [
+      [
+       15,
+       13
+      ],
+      [
+       6,
+       5
+      ]
+     ],
+     "width": 5,
+     "signed": false,
+     "addr_scale": 4,
+     "bias": 0,
+     "range": [
+      0,
+      31
+     ]
+    }
+   },
+   "reserved": []
+  }
+ }
+}

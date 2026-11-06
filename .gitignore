@@ -13,3 +13,7 @@ test/sim_build
 test/__pycache__/
 test/results.xml
 test/gate_level_netlist.v
+.obsidian/
+local/
+__pycache__/
+lint.txt

@@ -18,6 +18,24 @@ jobs:
         with:
           pdk: ihp-sg13cmos5l
 
+      # Keep the signoff and routing reports even when the build fails (DRC, congestion, area and timing numbers).
+      # Download them from the "Artifacts" section at the bottom of the run page.
+      - name: Keep the DRC and routing reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reports
+          path: |
+            runs/wokwi/*-klayout-drc/
+            runs/wokwi/*/reports/
+            runs/wokwi/final/metrics.json
+            runs/wokwi/final/metrics.csv
+            !**/*.gds
+            !**/*.odb
+            !**/*.def
+          retention-days: 14
+          if-no-files-found: ignore
+
   precheck:
     needs: gds
     runs-on: ubuntu-24.04
