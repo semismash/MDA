@@ -30,13 +30,14 @@ The IMEM macro's registered output is the IF/ID stage register: the instruction 
 The ID-stage path is then macro clock-to-out (6.4-7.4 ns slow) + decode + register read + operand mux, estimated at about 14 ns. The register-read indices come straight from instruction bits (`rs1` at `[12:10]`, `rs2` at `[9:7]`), with a 1-bit mux for `lui` (reads `rd`) and for the `lli` second slot, so they do not wait for the decoder.
 
 ### D3. PC convention.
-`pc[t]` always holds the address of the **next** instruction to fetch.
-- In IF (cycle k), thread `t` fetches `pc[t]` and increments it at the end of the cycle.
-- In EX (cycle k+2), `pc[t]` already equals instruction address + 1, which is exactly what jumps use: `target = pc + offset` for `jmp`/`jnl`/`jof`/`joc` (offsets are relative to PC+1), `target = rs1 + imm` for `jrg`, and the link value is `pc`.
-- A taken jump overwrites `pc[t]` at the end of EX, and it is fetched at k+3. No instruction address needs to travel down the pipeline.
-- `waitev` (Stage B) holds a thread by writing `pc - 1` back. The override interface is `ex_pc_we` / `ex_pc_val`.
+`pc[t]` holds the address of the **current** instruction of thread `t` (the one in IF, then ID, then EX). It changes only at the end of that thread's EX.
+- IF (cycle k): thread `t` fetches `pc[t]`.
+- EX (cycle k+2): `mda_pc` computes `next = A + B + carry`, with `A` = the PC or `rs1`, `B` = +1 or the offset, and a carry-in. Sequential flow is `PC + 1 + 0`, relative jumps are `PC + offset + 1` (offsets count from PC + 1) and `jrg` is `rs1 + imm`. `mda_branch_unit` sets the three selects, and the register updates with `pc_en = ex_v & (ex_thread == t)`.
+- The link value is `ex_pc + 1`, computed once in `mda_branch_unit` from the PC of the thread in EX, which `mda_fetch` selects by `ex_thread`.
+- The new PC is fetched in IF at k+3. No instruction address travels down the pipeline.
+- `waitev` (Stage B) holds a thread with `B` = offset 0 and no carry, so `next = PC`.
 
-IF increments the PC of the IF thread and EX overwrites the PC of the EX thread. These are different threads in every cycle, so there is no conflict.
+IF reads the PC of the IF thread and EX updates the PC of the EX thread. These are different threads in every cycle, so there is no conflict.
 
 ### D4. `lli` as a hold-then-build constant.
 The instruction word (word A) carries the upper byte `[23:16]` of the constant, and the suffix halfword (word B) carries `[15:0]`.
@@ -68,8 +69,8 @@ The LSU produces `fault` and `fault_cause` (misaligned `000`, out of bounds `001
 ### D8. Stage A needs a way to keep the logic alive for hardening.
 With no loader and no pins, the synthesizer would remove most of the design. The Stage A `mda_tt_top` should expose a trace hash (an 8-bit XOR/rotate accumulator of EX results, mapped to `uo_out`), and the unused inputs should be consumed in the `_unused` idiom. Memory contents are unknown after reset (the macros have no reset), so the cores run garbage, which still exercises everything. Programs for simulation are loaded through the testbench. A real loader is Stage B.
 
-### D9. Trace port (always present, left open at the TT wrapper).
-Do not use `ifdef` for this: synthesis removes the unused logic anyway, and the port set stays identical in simulation and formal. Fields, all registered at the end of EX: `tr_valid`, `tr_t` (thread, one-hot), `tr_pc`, `tr_instr`, `tr_rd_we`, `tr_rd`, `tr_wdata`, `tr_flags_we`, `tr_flags`, `tr_taken`, `tr_next_pc`, `tr_mem_we`, `tr_mem_addr`, `tr_mem_wdata`, `tr_fault`, `tr_cause`; plus a second event for a load return one cycle later (`tr_ld_valid`, `tr_ld_t`, `tr_ld_rd`, `tr_ld_data`). This is the interface that the lockstep checker against the reference model compares.
+### D9. Trace port (always present, observed in tests, hashed at the TT wrapper).
+Do not use `ifdef` for this: synthesis removes the unused logic anyway, and the port set stays identical in simulation and formal. The core exposes one record per instruction in EX (combinational, valid for that cycle) and one record per load return: `tr_valid`, `tr_thread`, `tr_pc` (address of the instruction), `tr_instr`, `tr_rd_we`, `tr_rd`, `tr_wdata`, `tr_flags` (flags of the thread as seen by this instruction), `tr_zn_we`, `tr_z`, `tr_n`, `tr_c_we`, `tr_c` (the flag updates), `tr_taken`, `tr_fault`, `tr_fault_cause`, `tr_mem_addr` (effective address; the strobe and data are the `dm_*` ports); and `tr_ld_valid`, `tr_ld_thread`, `tr_ld_rd`, `tr_ld_data` for the load return one cycle later.
 
 ### D10. Reset policy.
 
@@ -106,11 +107,11 @@ Stage B adds the following reset state, matching the start state in `Threading.m
 
 ## 2. Updated Stage A file list
 
-Compared with the earlier file tree: `mda_if_id` removed (D2), `mda_pc` merged into `mda_fetch` (a standalone PC module would be a thin wrapper), `mda_ex` removed (pure wiring, `mda_core` instantiates its children directly), and `mda_spatial` moved to Stage B. That makes **23 `src/` files plus the 2 macro stubs for Stage A** (`mda_suffix` and `mda_imm_gen` were split out of the decoder, and `mda_shifter` was dropped because the shifts live in `mda_alu`):
+Compared with the earlier file tree: `mda_if_id` removed (D2), `mda_spatial` moved to Stage B, `mda_shifter` dropped (the shifts live in `mda_alu`), `mda_suffix` and `mda_imm_gen` split out of the decoder, `mda_fault` added, and the register file split into the one-bank `mda_regfile` and the three-bank wrapper `mda_regbank`. That makes **26 `src/` files plus the 2 macro stubs for Stage A**, listed in `rtl.f` (the single source for `info.yaml` and `test/Makefile`, synchronized by `tools/sync_sources.py`):
 
 ```
-mda_pkg  mda_isa_pkg  mda_tt_top  mda_top  mda_core  mda_sched  mda_fetch  mda_id_ex  mda_decoder  mda_suffix  mda_imm_gen  mda_fault
-mda_regfile  mda_alu  mda_branch_unit  mda_cond  mda_flags  mda_lsu  mda_wb
+mda_pkg  mda_isa_pkg  mda_tt_top  mda_top  mda_core  mda_ex  mda_sched  mda_fetch  mda_pc  mda_id_ex  mda_decoder  mda_suffix  mda_imm_gen  mda_fault
+mda_regbank  mda_regfile  mda_alu  mda_branch_unit  mda_cond  mda_flags  mda_lsu  mda_wb
 mda_imem  mda_dmem  mda_sram_sim  mda_sync
 RM_IHPSG13_1P_1024x16_c2_bm_bist.v   RM_IHPSG13_1P_256x32_c2_bm_bist.v
 ```
@@ -157,31 +158,57 @@ Reset sets the counter to thread 0 and `id_v` low. The counter also returns to t
 
 The wrapper decodes `Thread` to the one-hot `ThreadSel` wherever it needs per-thread enables (PC enables, flag gating, register bank writes, the suffix buffer select). The thread tag in `mda_id_ex` and the schedule carry the same information, so the lockstep and formal checks assert that `ex_thread` equals the schedule.
 
-### `mda_fetch` (contains the three PCs)
-| Port | Dir | Width | Description |
+### `mda_fetch`
+The three program counters (three `mda_pc` instances), the IF address mux and the EX PC mux. All three PCs see the same adder controls, and only the one whose thread is in EX is enabled.
+
+| Port | Dir | Type | Description |
 |---|---|---|---|
-| `go` | in | 1 | Load the entry PCs and start |
-| `entry_pc` | in | 3*IMEM_ADDR_WIDTH | Entry PC of each thread |
-| `if_t`, `ex_t` | in | 3 each | From `mda_sched` |
-| `ex_pc_we`, `ex_pc_val` | in | 1, IMEM_ADDR_WIDTH | Override from EX (taken jump) |
-| `imem_addr` | out | IMEM_ADDR_WIDTH | `pc[if_t]`, to `mda_imem` |
-| `ex_pc` | out | IMEM_ADDR_WIDTH | `pc[ex_t]` = instruction address + 1 |
+| `clk`, `rst_n` | in | 1 | Clock and reset |
+| `go` | in | 1 | Load the three entry points |
+| `entry_pc0`, `entry_pc1`, `entry_pc2` | in | `PcAddr` | Entry point of each thread |
+| `if_thread` | in | `Thread` | Thread in IF |
+| `ex_v`, `ex_thread` | in | 1, `Thread` | EX qualifier and thread tag, give the PC enables |
+| `pc_in1`, `pc_in2`, `pc_cin`, `pc_offset` | in | 1, 1, 1, `PcAddr` | From `mda_branch_unit` |
+| `rs1_pc` | in | `PcAddr` | Low bits of `rs1`, the `jrg` base |
+| `if_pc` | out | `PcAddr` | PC of the thread in IF, the instruction memory address |
+| `ex_pc` | out | `PcAddr` | PC of the thread in EX, the address of the instruction in EX |
+
+### `mda_pc`
+One thread's program counter and its adder, `next = A + B + carry`.
+
+| Port | Dir | Type | Description |
+|---|---|---|---|
+| `clk`, `rst_n` | in | 1 | Clock and reset (the PC resets to 0) |
+| `load_en`, `entry_pc` | in | 1, `PcAddr` | Entry point load, with priority over the update |
+| `pc_en` | in | 1 | Update enable, high when this thread's instruction is in EX |
+| `pc_in1`, `rs1_in` | in | 1, `PcAddr` | `A`: 1 selects `rs1_in`, 0 selects the PC |
+| `pc_in2`, `imm_in` | in | 1, `PcAddr` | `B`: 1 selects `imm_in`, 0 selects +1 |
+| `pc_cin` | in | 1 | Carry-in |
+| `pc_out` | out | `PcAddr` | The PC |
 
 ### `mda_decoder`, `mda_suffix`, `mda_imm_gen`
 The ports of these three blocks, the immediate formats, the decoding rules and the draft decode matrix are specified in `Decoder_Interface.md`, which supersedes the proposal that was listed here. In outline: `mda_decoder` is a combinational function of `instr`, `suffix_pend` and `suffix_rd`. `mda_suffix` holds the per-thread suffix state (D4). `mda_imm_gen` builds the 32-bit immediate from `instr`, `imm_sel`, `rs1_data` (only for `lui`) and `suffix_imm8`.
 
 ### `mda_regfile`
-| Port | Dir | Width | Description |
-|---|---|---|---|
-| `id_t` | in | 3 | Bank to read (one-hot) |
-| `ra_idx`, `rb_idx` | in | 3 each | |
-| `ra_data`, `rb_data` | out | 32 each | |
-| `ex_t` | in | 3 | Bank for the EX write |
-| `w_ex_we`, `w_ex_idx`, `w_ex_data` | in | 1, 3, 32 | |
-| `if_t` | in | 3 | Bank for the load-return write |
-| `w_ld_we`, `w_ld_idx`, `w_ld_data` | in | 1, 3, 32 | |
+One thread's register file: 8 registers, two read ports, one write port, no reset (the spec leaves the registers uninitialized, D10).
 
-No reset on the registers (the spec leaves them uninitialized), so the module has no `rst_n` port (D10). Add an assertion that `ex_t` and `if_t` banks never write in the same cycle with the same bank (they cannot, by D1).
+| Port | Dir | Type | Description |
+|---|---|---|---|
+| `clk` | in | 1 | Clock |
+| `r_addr1`, `r_addr2` | in | `RegAddr` | Read addresses |
+| `w_addr`, `w_data`, `w_enable` | in | `RegAddr`, `Word`, 1 | Write port |
+| `r_data1`, `r_data2` | out | `Word` | Read data (combinational) |
+
+### `mda_regbank`
+Three `mda_regfile` banks, one per thread. Reads select the bank of the ID thread, writes are routed by the thread tags (`w_ex_thread`, `w_ld_thread`). The EX write and the load-return write never hit the same bank in one cycle (a load returns while its thread is in IF, not EX), so the EX write simply has priority. Thread value 3 is unused and reads bank 0.
+
+| Port | Dir | Type | Description |
+|---|---|---|---|
+| `clk` | in | 1 | Clock |
+| `rd_thread`, `r_addr1`, `r_addr2` | in | `Thread`, `RegAddr` | Read side (ID stage) |
+| `w_ex_we`, `w_ex_thread`, `w_ex_addr`, `w_ex_data` | in | | EX write |
+| `w_ld_we`, `w_ld_thread`, `w_ld_addr`, `w_ld_data` | in | | Load-return write |
+| `r_data1`, `r_data2` | out | `Word` | Read data |
 
 ### `mda_id_ex`
 ID/EX pipeline register. Inputs carry the prefix `id_`, outputs the prefix `ex_`, and the names follow the decoder outputs.
@@ -358,21 +385,30 @@ Parameters `AW`, `DW`. One port, synchronous read with a registered output, per-
 
 Parameter `WIDTH`. Used for the reset input in `mda_tt_top` (both edges synchronized, so assertion takes up to two cycles) and for the Stage B pin inputs.
 
+### `mda_ex`
+The EX stage: `mda_alu`, `mda_branch_unit`, `mda_lsu`, `mda_fault`, `mda_wb` and the three `mda_flags` (only the flags of the thread in EX are updated, gated by `ex_thread`; the Stage B event inputs are tied off, with `f_osr_empty` high). Inputs are the `ex_*` signals of `mda_id_ex`, `ex_pc` and `dm_rdata`. Outputs: the PC controls (`pc_in1`, `pc_in2`, `pc_cin`, `pc_offset`), the data memory request (`dm_*`), the register write requests (`w_ex_*`, `w_ld_*`) and the trace fields (`tr_flags`, `tr_zn_we`, `tr_z`, `tr_n`, `tr_c_we`, `tr_c`, `tr_taken`, `tr_fault`, `tr_fault_cause`, `tr_mem_addr`).
+
 ### `mda_core`
-Ports: `clk`, `rst_n`, `go`, `entry_pc[3*IMEM_ADDR_WIDTH]`, the IMEM interface (`imem_addr`, `imem_data`, `imem_en`), the DMEM interface (the `dm_*` signals above), and the trace port (D9). It instantiates `mda_sched`, `mda_fetch`, `mda_decoder`, `mda_suffix` (selected with `id_t`), `mda_imm_gen`, `mda_regfile`, `mda_id_ex`, `mda_alu`, `mda_branch_unit`, `mda_flags`, `mda_lsu` and `mda_wb`.
+Ports: `clk`, `rst_n`, `go` (a one-cycle pulse), `entry_pc0` to `entry_pc2`, the instruction memory interface (`imem_en`, `imem_addr`, `imem_data`), the data memory interface (`dm_en`, `dm_we`, `dm_addr`, `dm_wdata`, `dm_wstrb`, `dm_rdata`) and the trace port (D9). It holds the `run` flop (set by `go`, cleared by reset), the ID stage (decoder, suffix buffer, register read, immediate generator) and instantiates `mda_sched`, `mda_fetch`, `mda_regbank`, `mda_id_ex` and `mda_ex`. The instruction memory output is the IF/ID register (D2), and the Stage B `ex_sp_op` is left open.
 
 ### `mda_top`
-`mda_core` + `mda_imem` + `mda_dmem`, with the loader write ports and the trace exposed as plain ports. Stage B adds the I/O and event blocks.
+`mda_core` + `mda_imem` + `mda_dmem`, with the loader write ports (`imem_ld_*`, `dmem_ld_*`, used while the threads are held) and the trace passed through as plain ports. Stage B adds the I/O and event blocks.
 
-### `mda_tt_top`
-The `tt_um_<yourname>_mda` wrapper: Tiny Tapeout pin mapping, reset synchronizer, the trace hash on `uo_out` (D8), unused inputs consumed. Check the top module name against `info.yaml`.
+### `tt_um_mda` (`mda_tt_top.sv`)
+The Tiny Tapeout wrapper: pin mapping, the reset synchronizer (`mda_sync`), a one-cycle `go` pulse in the first cycle after reset is released (entry points all 0, no loader in this harness), an 8-bit trace hash on `uo_out` that folds register writes, load returns, jumps, faults and the PC (D8), `uio_*` driven low and the unused inputs consumed. The module name must match `top_module` in `info.yaml`.
 
 ## 5. Verification for Stage A
 
-- **Decoder:** exhaustive over all 65,536 words against the reference model (encoded legal fields, every illegal encoding, reserved bits). Suffix words are checked as data, not instructions.
-- **Lockstep:** random programs on all three threads, compared event by event over the trace port. Cover: every instruction at its range limits, `lli` corner cases from D4, PC wrap, byte lanes for loads and stores, misaligned and out-of-bounds loads and stores (store suppressed, load returns 0), a store by one thread followed by a load by another, and illegal words as no-ops.
-- **Random initial state:** run each program twice with different random initial registers and DMEM contents and require identical traces for everything the program initializes.
-- **Formal (small modules only):** `mda_sched` (exactly one thread per stage, rotation every cycle), and an assertion that the two regfile write banks never coincide.
+Done, without a compiler (model-level, with the interpreter in `verif/`):
+- **Decoder and immediate generator:** exhaustive over all 65,536 words and both suffix states against expectations derived from `isa.yaml`, with mutation checks.
+- **Leaf modules:** `mda_alu` (60,000 random cases against an independent reference), `mda_lsu` (against a byte-addressable reference memory), `mda_fault` (exhaustive), `mda_sched`, `mda_branch_unit` (over every word, with the decoder in front), `mda_id_ex`, `mda_wb`.
+- **Whole design, `verif/mda_e2e.py`:** the elaborated `mda_top` (core, memories, loader ports) runs assembled programs and is compared with the independent eval simulator on final registers, flags and the whole data memory. A directed three-thread program plus about 490 random three-thread programs (loops, byte and word accesses, `lli`, `jrg`, misaligned and out-of-bounds faults, with per-thread fault rates) all match. 25 injected plumbing bugs (wrong thread tags, bank routing, PC enables, flag gating, jump polarity) were each caught. `tt_um_mda` was also checked: reset synchronizer, a single `go` pulse, hash activity, mid-run reset.
+
+Still to do:
+- **Lint** with Verilator and a Yosys probe of the constructs used (`casez`, typed localparams, `import` at file scope), since nothing has been compiled yet.
+- **Lockstep on the trace port** event by event, which needs the reference model to emit the same records (the end-to-end test compares final state only).
+- **Random initial state twins:** run each program twice with different random initial registers and DMEM contents and require identical traces for everything the program initializes.
+- **Formal (small modules only):** `mda_sched` (exactly one thread per stage, rotation every cycle), `ex_thread` equals the schedule, and the two regbank write ports never hit the same bank.
 
 ## 6. Risks to plan for
 
@@ -385,6 +421,6 @@ The `tt_um_<yourname>_mda` wrapper: Tiny Tapeout pin mapping, reset synchronizer
 
 ## 7. Next steps
 
-1. `isa.yaml`, the generated `mda_isa_pkg` and the golden encoding vectors: done (`tools/isa/`).
-2. In order: `mda_pkg`, `mda_sync`, `mda_sched`, `mda_regfile`, `mda_alu`, `mda_decoder`, then the rest of the pipeline. Test each leaf module with its own small bench before integration.
-3. A first hardening run of the Stage A core with both macros.
+1. Lint all of `src/`, then re-run `python3 verif/mda_e2e.py directed` and a fuzz batch after every fix.
+2. Run `python3 tools/sync_sources.py` so `info.yaml` and `test/Makefile` follow `rtl.f`, set `top_module` to `tt_um_mda` (or rename the module), and remove `project.v` and the other stale files.
+3. A first hardening run of the Stage A core with both macros (the second macro in `config.json` and the stripe script are the open items).
