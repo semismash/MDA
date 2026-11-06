@@ -21,8 +21,25 @@ module mda_branch_unit (
 );
 
     localparam JOF_MASK_START_BIT   = 15;
-    localparam JOF_MASK_START_BIT   = 12;
+    localparam JOF_MASK_END_BIT     = 12;
     localparam JOC_INV_BIT          = 15;
+    localparam JMP_OFFSET_START_BIT     = 12;
+    localparam JMP_OFFSET_END_BIT       = 5;
+    localparam JNL_OFFSET_START_BIT     = 15;
+    localparam JNL_OFFSET_END_BIT       = 6;
+    localparam JOF_OFFSET_START_BIT     = 11;
+    localparam JOF_OFFSET_END_BIT       = 6;
+    localparam JOC_OFFSET_HI_START_BIT  = 14;   // joc keeps its offset in two ranges: the upper bits...
+    localparam JOC_OFFSET_HI_END_BIT    = 13;
+    localparam JOC_OFFSET_LO_START_BIT  = 9;    // ...and the lower bits
+    localparam JOC_OFFSET_LO_END_BIT    = 6;
+    localparam JRG_OFFSET_START_BIT     = 9;
+    localparam JRG_OFFSET_END_BIT       = 5;
+
+    localparam JMP_OFFSET_WIDTH = JMP_OFFSET_START_BIT - JMP_OFFSET_END_BIT + 1;    // 8
+    localparam JOF_OFFSET_WIDTH = JOF_OFFSET_START_BIT - JOF_OFFSET_END_BIT + 1;    // 6
+    localparam JOC_OFFSET_WIDTH = (JOC_OFFSET_HI_START_BIT - JOC_OFFSET_HI_END_BIT + 1) + (JOC_OFFSET_LO_START_BIT - JOC_OFFSET_LO_END_BIT + 1);    // 6
+    localparam JRG_OFFSET_WIDTH = JRG_OFFSET_START_BIT - JRG_OFFSET_END_BIT + 1;    // 5
 
     logic  is_jrg;
     Flags  cond_mask;
@@ -40,7 +57,7 @@ module mda_branch_unit (
         cond_inv  = 1'b0;
         case (br_type)
             BR_JOF: begin
-                cond_mask = 16'h0001 << instr[JOF_MASK_START_BIT:JOF_MASK_START_BIT];
+                cond_mask = 16'h0001 << instr[JOF_MASK_START_BIT:JOF_MASK_END_BIT];
                 cond_all  = 1'b0;
                 cond_inv  = br_jof_inv;
             end
@@ -95,11 +112,11 @@ module mda_branch_unit (
 
     always_comb begin
         case (br_type)
-            BR_JMP:  pc_offset = {{(IMEM_ADDR_WIDTH-8){instr[12]}}, instr[12:5]};                // 8 bits
-            BR_JNL:  pc_offset = instr[15:6];                                                    // 10 bits, the whole PC width
-            BR_JOF:  pc_offset = {{(IMEM_ADDR_WIDTH-6){instr[11]}}, instr[11:6]};                // 6 bits
-            BR_JOC:  pc_offset = {{(IMEM_ADDR_WIDTH-6){instr[14]}}, instr[14:13], instr[9:6]};   // 6 bits from two ranges
-            BR_JRG:  pc_offset = {{(IMEM_ADDR_WIDTH-5){instr[9]}}, instr[9:5]};                  // 5 bits
+            BR_JMP:  pc_offset = {{(IMEM_ADDR_WIDTH-JMP_OFFSET_WIDTH){instr[JMP_OFFSET_START_BIT]}}, instr[JMP_OFFSET_START_BIT:JMP_OFFSET_END_BIT]};                                                              // 8 bits
+            BR_JNL:  pc_offset = instr[JNL_OFFSET_START_BIT:JNL_OFFSET_END_BIT];                                                                                                                                  // 10 bits, the whole PC width
+            BR_JOF:  pc_offset = {{(IMEM_ADDR_WIDTH-JOF_OFFSET_WIDTH){instr[JOF_OFFSET_START_BIT]}}, instr[JOF_OFFSET_START_BIT:JOF_OFFSET_END_BIT]};                                                              // 6 bits
+            BR_JOC:  pc_offset = {{(IMEM_ADDR_WIDTH-JOC_OFFSET_WIDTH){instr[JOC_OFFSET_HI_START_BIT]}}, instr[JOC_OFFSET_HI_START_BIT:JOC_OFFSET_HI_END_BIT], instr[JOC_OFFSET_LO_START_BIT:JOC_OFFSET_LO_END_BIT]};   // 6 bits from two ranges
+            BR_JRG:  pc_offset = {{(IMEM_ADDR_WIDTH-JRG_OFFSET_WIDTH){instr[JRG_OFFSET_START_BIT]}}, instr[JRG_OFFSET_START_BIT:JRG_OFFSET_END_BIT]};                                                              // 5 bits
             default: pc_offset = '0;
         endcase
     end

@@ -17,8 +17,34 @@ project:
   # Source files must be in ./src and you must list each source file separately, one per line.
   # Don't forget to also update `PROJECT_SOURCES` in test/Makefile.
   source_files:
-    - "project.v"
+    - "mda_pkg.sv"
+    - "mda_isa_pkg.sv"
+    - "mda_sync.sv"
+    - "mda_sram_sim.sv"
+    - "mda_imem.sv"
+    - "mda_dmem.sv"
+    - "mda_alu.sv"
+    - "mda_regfile.sv"
+    - "mda_regbank.sv"
+    - "mda_pc.sv"
+    - "mda_fetch.sv"
+    - "mda_flags.sv"
+    - "mda_cond.sv"
+    - "mda_branch_unit.sv"
+    - "mda_decoder.sv"
+    - "mda_suffix.sv"
+    - "mda_imm_gen.sv"
+    - "mda_fault.sv"
+    - "mda_lsu.sv"
+    - "mda_wb.sv"
+    - "mda_sched.sv"
+    - "mda_id_ex.sv"
+    - "mda_ex.sv"
+    - "mda_core.sv"
+    - "mda_top.sv"
+    - "mda_tt_top.sv"
     - "RM_IHPSG13_1P_1024x16_c2_bm_bist.v"
+    - "RM_IHPSG13_1P_256x32_c2_bm_bist.v"
  
 # The pinout of your project. Leave unused pins blank. DO NOT delete or add any pins.
 # This section is for the datasheet/website. Use descriptive names (e.g., RX, TX, MOSI, SCL, SEG_A, etc.).

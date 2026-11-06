@@ -437,7 +437,7 @@ def gen_pkg(isa):
             a(f"  localparam logic [15:0] RSV_{i.name.upper()} = 16'h{mask_of(i.reserved):04X};")
     a('')
     a('  // ---- illegal field values')
-    a(f"  localparam int RPIN_MODE_MAX_LEGAL = {max(isa.y['rpin_modes'].values())};   // rpin modes above this are illegal words")
+    a(f"  localparam RpinMode RPIN_MODE_MAX_LEGAL = 3'd{max(isa.y['rpin_modes'].values())};   // rpin modes above this are illegal words")
     a('')
     a('  // ---- rpin modes, cfg targets (targets 6 and 7 are a bad cfg at run time, not illegal words)')
     for k, v in isa.y['rpin_modes'].items():

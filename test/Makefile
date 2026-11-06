@@ -6,7 +6,32 @@ SIM ?= icarus
 FST ?= -fst # Use more efficient FST format
 TOPLEVEL_LANG ?= verilog
 SRC_DIR = $(PWD)/../src
-PROJECT_SOURCES = project.v
+PROJECT_SOURCES = mda_pkg.sv \
+    mda_isa_pkg.sv \
+    mda_sync.sv \
+    mda_sram_sim.sv \
+    mda_imem.sv \
+    mda_dmem.sv \
+    mda_alu.sv \
+    mda_regfile.sv \
+    mda_regbank.sv \
+    mda_pc.sv \
+    mda_fetch.sv \
+    mda_flags.sv \
+    mda_cond.sv \
+    mda_branch_unit.sv \
+    mda_decoder.sv \
+    mda_suffix.sv \
+    mda_imm_gen.sv \
+    mda_fault.sv \
+    mda_lsu.sv \
+    mda_wb.sv \
+    mda_sched.sv \
+    mda_id_ex.sv \
+    mda_ex.sv \
+    mda_core.sv \
+    mda_top.sv \
+    mda_tt_top.sv
 # Stand-in simulation model of the SRAM macro (the stub in src/ is an empty blackbox).
 # TODO: switch to the foundry behavioural model from the PDK once its path is confirmed.
 MACRO_MODEL = $(PWD)/RM_IHPSG13_1P_1024x16_c2_bm_bist_model.v

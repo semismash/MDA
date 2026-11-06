@@ -90,7 +90,7 @@ package mda_isa_pkg;
   localparam logic [15:0] RSV_CFG = 16'hE200;
 
   // ---- illegal field values
-  localparam int RPIN_MODE_MAX_LEGAL = 4;   // rpin modes above this are illegal words
+  localparam RpinMode RPIN_MODE_MAX_LEGAL = 3'd4;   // rpin modes above this are illegal words
 
   // ---- rpin modes, cfg targets (targets 6 and 7 are a bad cfg at run time, not illegal words)
   localparam RpinMode RPIN_LEVEL = 3'd0;
