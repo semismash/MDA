@@ -90,7 +90,7 @@ All RR instructions are encoded as `[RD, RS1, RS2, WB, FUNCT, 000]`, and have no
 |`xor`|`xor rd, rs1, rs2`|`001`|Sets `Z`, `N`|
 |`shl`|`shl rd, rs1, rs2`|`010`|`rs2` is the shift amount. Sets `Z`, `N`, `C`|
 |`shr`|`shr rd, rs1, rs2`|`011`|`rs2` is the shift amount. Sets `Z`, `N`, `C`|
-|`cmp`|`cmp rd, rs1, rs2`|`100`|Unsigned compare, `rd` = 1 if `rs1` < `rs2`. `N` is set if less, `Z` if equal, otherwise both are 0|
+|`cmp`|`cmp rd, rs1, rs2`|`100`|Unsigned three-way compare. `rd` = 1 if `rs1` > `rs2`, -1 (so 0xFFFFFFFF) if `rs1` < `rs2`, 0 if equal. `N` is set if less, `Z` if equal, otherwise both are 0|
 |`cmpa`|`cmpa rd, rs1, rs2`|`101`|The same, signed|
 |`and`|`and rd, rs1, rs2`|`110`|Sets `Z`, `N`|
 |`or`|`or rd, rs1, rs2`|`111`|Sets `Z`, `N`|
