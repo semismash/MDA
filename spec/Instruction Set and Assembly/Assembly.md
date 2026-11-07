@@ -24,7 +24,7 @@ The MDA ASM has syntax that is very similar to other major assembly languages. T
 
 |Keyword|Used with|Meaning|
 |---|---|---|
-|`@na`|Any instruction with a destination register|No write back, only update the flags|
+|`@na`|`add`, `xor`, `and`, `or`, `cmp`, `cmpa`, `shl`, `shr`, `addi`, `xori`, `shli`, `shri` (the instructions with a WB bit)|No write back, only update the flags. On any other instruction it is an assembler error, as those always write `rd`|
 |`@inv`, `@noinv`|`jof`|Invert the flag's outcome or not. `@noinv` is the default if the keyword is left out|
 |`@all`, `@any`, `@none`, `@notall`|`joc`|Mode - all selected flags set, any selected flag set, no selected flag set, not all selected flags set|
 |`@any`, `@all`, `@set`, `@clear`, `@consume`|`waitev`|Condition (any or all of the selected flags, set or clear) and whether the sticky flags are consumed on wake up|
@@ -48,7 +48,7 @@ MDA ASM instructions are written in formats, given by the examples below.
 - Constant loading - `lbi r1, 200` (load the 8-bit constant 200 into r1)
 - Jump operation - `jmp r4, my_label` (Jump to address at label_name and store the address of the next instruction in r4)
 - Label definition - `my_label:` (subject to jump distance restrictions)
-- No WB - `xori @na, r7, r2` (XOR r7 and r2, don't store result, update flags)
+- No WB - `xor @na, r7, r2` (XOR r7 and r2, don't store result, update flags)
 - Flag jump - `jof Z, @inv, my_label` (Jump if the `Z` flag is not set)
 - Condition inversion - `joc r2, @notall, my_label` (Jump if not all of the flags selected by the mask in r2 are set, e.g. the mask `M_Z | M_N` jumps if either of those two flags is not set)
 - Memory access - `lb r3, 10(r2)` (Load data from address at `r2 + 10` to r3. Offsets are unsigned)
