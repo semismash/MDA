@@ -1,3 +1,8 @@
+[![docs](https://github.com/semismash/MDA/actions/workflows/docs.yaml/badge.svg)](https://github.com/semismash/MDA/actions/workflows/docs.yaml)
+[![test](https://github.com/semismash/MDA/actions/workflows/test.yaml/badge.svg)](https://github.com/semismash/MDA/actions/workflows/test.yaml)
+[![gds](https://github.com/semismash/MDA/actions/workflows/gds.yaml/badge.svg)](https://github.com/semismash/MDA/actions/workflows/gds.yaml)
+[![fpga](https://github.com/semismash/MDA/actions/workflows/fpga.yaml/badge.svg)](https://github.com/semismash/MDA/actions/workflows/fpga.yaml)
+
 # MDA: Minimalist Deterministic Architecture
 
 A three-thread barrel processor for cycle-exact protocol emulation. Entry in the [Jane Street Protocol Emulator ASIC Competition](https://blog.janestreet.com/protocol-emulator-asic-competition/), targeting [Tiny Tapeout](https://tinytapeout.com) on IHP SG13CMOS5L (6x4 tiles, submission deadline 18 January 2027).
