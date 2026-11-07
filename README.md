@@ -83,9 +83,9 @@ The SystemVerilog is the source of truth. Tiny Tapeout's tools read the design w
 
 ## Documentation
 
-- [Instruction set](spec/Instruction_Set.md), [encoding](spec/Instruction_Encoding.md) and [assembly syntax](spec/Assembly.md)
-- [Threading](spec/Threading.md), [events](spec/Events.md) and [I/O interface](spec/I-O_Interface.md)
-- [Stage A microarchitecture](spec/Stage_A_Microarchitecture.md) and [decoder interface](spec/Decoder_Interface.md)
+- [Instruction set](spec/Instruction%20Set%20and%20Assembly/Instruction%20Set.md), [encoding](spec/Instruction%20Set%20and%20Assembly/Instruction%20Encoding.md) and [assembly syntax](spec/Instruction%20Set%20and%20Assembly//Assembly.md)
+- [Threading](spec/Processor%20Architecture/Threading.md), [events](spec/Processor%20Architecture/Events.md) and [I/O interface](spec/Processor%20Architecture/I-O%20Interface.md)
+- [Stage A microarchitecture](spec/Processor%20Architecture/Stage_A_Microarchitecture.md).
 - [Stage A baseline report](docs/Stage_A_Baseline.md)
 
 ## Third-party material
