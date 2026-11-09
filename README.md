@@ -52,7 +52,7 @@ From the second hardening run (full report in [docs/Stage_A_Baseline.md](docs/St
 
 - **Instruction decode:** exhaustive over all 65,536 instruction words and both suffix states, against expectations generated from `tools/isa/isa.yaml`, the single source of truth for every encoding.
 - **Leaf modules:** ALU (80,000 random cases against an independent reference), load/store unit (against a byte-addressable reference memory), fault logic (exhaustive), scheduler and branch unit.
-- **Whole design:** `verif/mda_e2e.py` runs assembled programs on the elaborated RTL, including the memories and loader ports, and compares registers, flags and data memory with the independent simulator in `tools/eval_model/`. A directed program and hundreds of random three-thread programs match, and 25 deliberately injected plumbing bugs were each caught.
+- **Whole design:** `verif/mda_e2e.py` runs assembled programs on the elaborated RTL, including the memories and loader ports, and compares registers, flags and data memory withthe separately written cycle-level model in `tools/eval_model/`. A directed program and hundreds of random three-thread programs match, and 25 deliberately injected plumbing bugs were each caught.
 - **CI:** a cocotb test loads a program into the memories and checks the resulting data memory, and a gate-level test runs on the synthesized netlist.
 - **Lint:** Verilator `-Wall` clean in the simulation-RAM, macro and generated-Verilog configurations.
 
